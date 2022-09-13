@@ -1,0 +1,33 @@
+#!/bin/bash
+# pkg-config wrapper for cross-compiling against a sysroot
+#
+# The list of directories to search is based on running:
+#   $ pkg-config --debug 2>&1 | grep -E "#[0-9]+"
+
+script_name="$(basename "$0")"
+host_type="${script_name%-sysroot-pkg-config}"
+host_multiarch="$(dpkg-architecture -t"${host_type}" -qDEB_HOST_MULTIARCH 2>/dev/null)"
+build_multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null)"
+
+PKG_CONFIG_SYSROOT_DIR="$SYSROOT"
+
+PKG_CONFIG_LIBDIR="${SYSROOT}/usr/local/lib/${host_multiarch}/pkgconfig"
+
+# If it's a native build then add a non-multiarch aware library directory
+if [ "${build_multiarch}" == "${host_multiarch}" ]; then
+  PKG_CONFIG_LIBDIR="${PKG_CONFIG_LIBDIR}:${SYSROOT}/usr/local/lib/pkgconfig"
+fi
+
+PKG_CONFIG_LIBDIR="${PKG_CONFIG_LIBDIR}:${SYSROOT}/usr/local/share/pkgconfig"
+PKG_CONFIG_LIBDIR="${PKG_CONFIG_LIBDIR}:${SYSROOT}/usr/lib/${host_multiarch}/pkgconfig"
+
+# If it's a native build then add a non-multiarch aware library directory
+if [ "${build_multiarch}" == "${host_multiarch}" ]; then
+  PKG_CONFIG_LIBDIR="${PKG_CONFIG_LIBDIR}:${SYSROOT}/usr/lib/pkgconfig"
+fi
+
+PKG_CONFIG_LIBDIR="${PKG_CONFIG_LIBDIR}:${SYSROOT}/usr/share/pkgconfig"
+
+export PKG_CONFIG_SYSROOT_DIR PKG_CONFIG_LIBDIR
+
+exec pkg-config "$@"

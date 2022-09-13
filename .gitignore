@@ -1,0 +1,4 @@
+*.o
+*.d
+rogue/binary_thead_linux*
+rogue_km/binary_thead_linux*
