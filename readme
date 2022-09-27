@@ -1,0 +1,17 @@
+Steps:
+1, build-chain prepare
+      https://occ-oss-prod.oss-cn-hangzhou.aliyuncs.com/resource/1836682/1640771208032/Xuantie-900-gcc-linux-5.10.4-glibc-x86_64-V2.2.4-20211227.tar.gz
+      set PATH env, for example:
+	  PATH=$PATH:/path/to/build-chain/bin
+2, build kernel
+      git clone git@gitee.com:openanolis/riscv-cloud-kernel.git
+      cd riscv-cloud-kernel
+      git checkout devel-5.10
+      make -j16 CROSS_COMPILE=riscv64-unknown-linux-gnu- ARCH=riscv light_defconfig
+      make -j16 CROSS_COMPILE=riscv64-unknown-linux-gnu- ARCH=riscv
+3, set KERNELDIR env as the kernel dir
+      for example:
+          export KERNELDIR=/path/to/anolis/riscv-cloud-kernel/
+4, just run "make"
+5, get the files in output dir
+6, run "make clean" to do the cleanup

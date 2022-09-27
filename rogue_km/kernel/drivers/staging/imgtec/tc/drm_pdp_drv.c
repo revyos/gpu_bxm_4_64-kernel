@@ -880,5 +880,5 @@ module_platform_driver(pdp_platform_driver);
 
 MODULE_AUTHOR("Imagination Technologies Ltd. <gpl-support@imgtec.com>");
 MODULE_DESCRIPTION(DRIVER_DESC);
-MODULE_DEVICE_TABLE(platform, pdp_platform_device_id_table);
+//MODULE_DEVICE_TABLE(platform, pdp_platform_device_id_table);
 MODULE_LICENSE("Dual MIT/GPL");

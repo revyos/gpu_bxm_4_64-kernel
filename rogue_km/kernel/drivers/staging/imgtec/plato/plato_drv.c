@@ -91,7 +91,7 @@ static struct pci_driver plato_pci_driver = {
 };
 
 module_pci_driver(plato_pci_driver);
-MODULE_DEVICE_TABLE(pci, plato_pci_tbl);
+//MODULE_DEVICE_TABLE(pci, plato_pci_tbl);
 
 static struct plato_debug_register plato_noc_regs[] = {
 	{"NOC Offset 0x00", 0x00, 0},

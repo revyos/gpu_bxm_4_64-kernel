@@ -666,7 +666,7 @@ static struct pci_driver tc_pci_driver = {
 
 module_pci_driver(tc_pci_driver);
 
-MODULE_DEVICE_TABLE(pci, tc_pci_tbl);
+//MODULE_DEVICE_TABLE(pci, tc_pci_tbl);
 
 int tc_enable(struct device *dev)
 {
