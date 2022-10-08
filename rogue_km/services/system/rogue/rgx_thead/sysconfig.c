@@ -314,7 +314,7 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 
 	/* Setup RGX specific timing data */
 	psRGXTimingInfo->ui32CoreClockSpeed        = RGX_THEAD_CORE_CLOCK_SPEED;
-	psRGXTimingInfo->bEnableActivePM           = IMG_TRUE;
+	psRGXTimingInfo->bEnableActivePM           = IMG_FALSE;
 	psRGXTimingInfo->bEnableRDPowIsland        = IMG_FALSE;
 	psRGXTimingInfo->ui32ActivePMLatencyms     = SYS_RGX_ACTIVE_POWER_LATENCY_MS;
 
@@ -353,8 +353,8 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
     psDevConfig->eDefaultHeap = UMA_DEFAULT_HEAP;
 
 	/* No power management on no HW system */
-    psDevConfig->pfnPrePowerState       = SysDevPrePowerState;
-    psDevConfig->pfnPostPowerState      = SysDevPostPowerState;
+    psDevConfig->pfnPrePowerState       = NULL;
+    psDevConfig->pfnPostPowerState      = NULL;
 
 	psDevConfig->bHasFBCDCVersion31      = IMG_FALSE;
 
