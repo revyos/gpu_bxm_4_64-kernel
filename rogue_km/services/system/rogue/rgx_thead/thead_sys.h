@@ -60,6 +60,7 @@ struct gpu_plat_if {
 	struct mutex set_power_state;
     struct clk *gpu_cclk;
     struct clk *gpu_aclk;
+    struct regmap *vosys_regmap;
 };
 
 struct gpu_plat_if *dt_hw_init(struct device *dev);

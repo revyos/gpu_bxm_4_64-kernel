@@ -52,17 +52,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <linux/pm_runtime.h>
 #include <linux/regulator/consumer.h>
 #include <linux/thermal.h>
+#include <linux/regmap.h>
+#include <linux/mfd/syscon.h>
 
 #include "thead_sys.h"
 
 int thead_mfg_enable(struct gpu_plat_if *mfg)
 {
     int ret;
+    int val;
 	ret = pm_runtime_get_sync(mfg->dev);
 	if (ret)
 		return ret;
 
-	        thead_debug("23thead_mfg_enable aclk\n");
+	thead_debug("23thead_mfg_enable aclk\n");
 	if (mfg->gpu_aclk) {
 		ret = clk_prepare_enable(mfg->gpu_aclk);
 		if (ret) {
@@ -78,6 +81,26 @@ int thead_mfg_enable(struct gpu_plat_if *mfg)
             goto err_pm_runtime_put;
 		}
 	}
+
+    /* rst gpu clkgen */
+    regmap_update_bits(mfg->vosys_regmap, 0x0, 2, 2);
+    regmap_read(mfg->vosys_regmap, 0x0, &val);
+    if (!(val & 0x2)) {
+        pr_info("[GPU_CLK_RST]" "val is %x\r\n", val);
+        clk_disable_unprepare(mfg->gpu_cclk);
+        clk_disable_unprepare(mfg->gpu_aclk);
+        goto err_pm_runtime_put;
+    }
+    udelay(1);
+    /* rst gpu */
+    regmap_update_bits(mfg->vosys_regmap, 0x0, 1, 1);
+    regmap_read(mfg->vosys_regmap, 0x0, &val);
+    if (!(val & 0x1)) {
+        pr_info("[GPU_RST]" "val is %x\r\n", val);
+        clk_disable_unprepare(mfg->gpu_cclk);
+        clk_disable_unprepare(mfg->gpu_aclk);
+        goto err_pm_runtime_put;
+    }
 	return 0;
 err_pm_runtime_put:
 	pm_runtime_put_sync(mfg->dev);
@@ -86,6 +109,13 @@ err_pm_runtime_put:
 
 void thead_mfg_disable(struct gpu_plat_if *mfg)
 {
+    int val;
+    regmap_update_bits(mfg->vosys_regmap, 0x0, 3, 0);
+    regmap_read(mfg->vosys_regmap, 0x0, &val);
+    if (val) {
+        pr_info("[GPU_RST]" "val is %x\r\n", val);
+        return;
+    }
 	if (mfg->gpu_aclk) {
 		clk_disable_unprepare(mfg->gpu_aclk);
 	    thead_debug("thead_mfg_disable aclk\n");
@@ -95,7 +125,7 @@ void thead_mfg_disable(struct gpu_plat_if *mfg)
 	    thead_debug("thead_mfg_disable cclk\n");
     }
 
-	    thead_debug("22thead_mfg_disable cclk\n");
+	thead_debug("22thead_mfg_disable cclk\n");
 	pm_runtime_put_sync(mfg->dev);
 }
 
@@ -122,6 +152,13 @@ struct gpu_plat_if *dt_hw_init(struct device *dev)
 		dev_err(dev, "devm_clk_get aclk failed !!!\n");
 	    pm_runtime_disable(dev);
 		return ERR_PTR(PTR_ERR(mfg->gpu_aclk));
+	}
+
+    mfg->vosys_regmap = syscon_regmap_lookup_by_phandle(dev->of_node, "vosys-regmap");
+	if (IS_ERR(mfg->vosys_regmap)) {
+		dev_err(dev, "syscon_regmap_lookup_by_phandle vosys-regmap failed !!!\n");
+	    pm_runtime_disable(dev);
+		return ERR_PTR(PTR_ERR(mfg->vosys_regmap));
 	}
 
 	mutex_init(&mfg->set_power_state);
