@@ -3288,7 +3288,9 @@ PVRSRV_ERROR PVRSRVCreateHWPerfHostThread(IMG_UINT32 ui32Timeout)
 	if (!ui32Timeout)
 		return PVRSRV_ERROR_INVALID_PARAMS;
 
-	OSLockAcquire(gpsPVRSRVData->hHWPerfHostPeriodicThread_Lock);
+    if (gpsPVRSRVData->hHWPerfHostPeriodicThread_Lock) {
+	    OSLockAcquire(gpsPVRSRVData->hHWPerfHostPeriodicThread_Lock);
+    }
 
 	/* Create only once */
 	if (gpsPVRSRVData->hHWPerfHostPeriodicThread == NULL)
@@ -3317,7 +3319,9 @@ PVRSRV_ERROR PVRSRVCreateHWPerfHostThread(IMG_UINT32 ui32Timeout)
 		PVR_LOG_IF_ERROR(eError, "OSEventObjectSignal");
 	}
 
-	OSLockRelease(gpsPVRSRVData->hHWPerfHostPeriodicThread_Lock);
+    if (gpsPVRSRVData->hHWPerfHostPeriodicThread_Lock) {
+	    OSLockRelease(gpsPVRSRVData->hHWPerfHostPeriodicThread_Lock);
+    }
 	return eError;
 }
 
@@ -3325,7 +3329,9 @@ PVRSRV_ERROR PVRSRVDestroyHWPerfHostThread(void)
 {
 	PVRSRV_ERROR eError = PVRSRV_OK;
 
-	OSLockAcquire(gpsPVRSRVData->hHWPerfHostPeriodicThread_Lock);
+    if (gpsPVRSRVData->hHWPerfHostPeriodicThread_Lock) {
+	    OSLockAcquire(gpsPVRSRVData->hHWPerfHostPeriodicThread_Lock);
+    }
 
 	/* Stop and cleanup the HWPerf periodic thread */
 	if (gpsPVRSRVData->hHWPerfHostPeriodicThread)
@@ -3356,7 +3362,9 @@ PVRSRV_ERROR PVRSRVDestroyHWPerfHostThread(void)
 		}
 	}
 
-	OSLockRelease(gpsPVRSRVData->hHWPerfHostPeriodicThread_Lock);
+    if (gpsPVRSRVData->hHWPerfHostPeriodicThread_Lock) {
+	    OSLockRelease(gpsPVRSRVData->hHWPerfHostPeriodicThread_Lock);
+    }
 	return eError;
 }
 #endif
