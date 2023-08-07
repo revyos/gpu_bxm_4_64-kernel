@@ -245,6 +245,7 @@ static PVRSRV_ERROR InitHostHeaps(SYS_DATA *psSysData,
 	psPhysHeap->ui32UsageFlags = PHYS_HEAP_USAGE_GPU_LOCAL;
 #elif (PLATO_MEMORY_CONFIG == PLATO_MEMORY_HYBRID)
 	psPhysHeap->ui32UsageFlags = PHYS_HEAP_USAGE_CPU_LOCAL;
+	PVR_DPF((PVR_DBG_WARNING, "Initialising CPU_LOCAL UMA Host PhysHeaps"));
 #if !defined(SUPPORT_PLATO_DISPLAY)
 	psPhysHeap->ui32UsageFlags |= PHYS_HEAP_USAGE_EXTERNAL;
 #endif
@@ -517,7 +518,7 @@ static PVRSRV_ERROR PlatoLocalMemoryTest(PVRSRV_DEVICE_CONFIG *psDevConfig)
 
 		for (i = 0; i < chunk/sizeof(IMG_UINT32); i++) {
 			*(pui32Virt + i) = 0xdeadbeef;
-			OSWriteMemoryBarrier();
+			OSWriteMemoryBarrier(pui32Virt);
 			tmp = *(pui32Virt + i);
 			if (tmp != 0xdeadbeef) {
 				PVR_DPF((PVR_DBG_ERROR,

@@ -82,7 +82,11 @@ tc-y += \
  kernel/drivers/staging/imgtec/tc/tc_apollo_debugfs.o
 endif
 
-ifeq ($(SUPPORT_ION),1)
+ifeq ($(SUPPORT_DMA_HEAP),1)
+tc-y += \
+ kernel/drivers/staging/imgtec/tc/dma_lma_heap.o \
+ kernel/drivers/staging/imgtec/tc/tc_dmabuf_heap.o
+else ifeq ($(SUPPORT_ION),1)
 tc-y += \
  kernel/drivers/staging/imgtec/tc/tc_ion.o \
  kernel/drivers/staging/imgtec/tc/ion_lma_heap.o \

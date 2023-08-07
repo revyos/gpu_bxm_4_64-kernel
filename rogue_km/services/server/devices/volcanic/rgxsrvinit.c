@@ -104,6 +104,7 @@ RGX_CNT_BLK_TYPE_MODEL_INDIRECT_LIST
 #define	HW_PERF_FILTER_DEFAULT         0x00000000 /* Default to no HWPerf */
 #define HW_PERF_FILTER_DEFAULT_ALL_ON  0xFFFFFFFF /* All events */
 #define AVAIL_POW_UNITS_MASK_DEFAULT   (PVRSRV_APPHINT_HWVALAVAILABLESPUMASK)
+#define AVAIL_RAC_MASK_DEFAULT         (PVRSRV_APPHINT_HWVALAVAILABLERACMASK)
 
 /* Kernel CCB size */
 
@@ -189,6 +190,7 @@ typedef struct _RGX_SRVINIT_APPHINTS_
 	IMG_BOOL   bValidateIrq;
 	IMG_BOOL   bValidateSOCUSCTimer;
 	IMG_UINT32 ui32AvailablePowUnitsMask;
+	IMG_UINT32 ui32AvailableRACMask;
 	IMG_BOOL   bInjectPowUnitsStateMaskChange;
 	IMG_BOOL   bEnablePowUnitsStateMaskChange;
 	IMG_UINT32 ui32FBCDCVersionOverride;
@@ -344,6 +346,7 @@ static INLINE void GetApphints(PVRSRV_RGXDEV_INFO *psDevInfo, RGX_SRVINIT_APPHIN
 	SrvInitParamGetBOOL(INITPARAM_NO_DEVICE,          pvParamState,  ValidateIrq,                                     psHints->bValidateIrq);
 	SrvInitParamGetBOOL(INITPARAM_NO_DEVICE,          pvParamState,  ValidateSOCUSCTimer,                     psHints->bValidateSOCUSCTimer);
 	SrvInitParamGetUINT32(INITPARAM_NO_DEVICE,        pvParamState,  HWValAvailableSPUMask,              psHints->ui32AvailablePowUnitsMask);
+	SrvInitParamGetUINT32(INITPARAM_NO_DEVICE,        pvParamState,  HWValAvailableRACMask,                   psHints->ui32AvailableRACMask);
 	SrvInitParamGetBOOL(psDevInfo->psDeviceNode,      pvParamState,  GPUUnitsPowerChange,           psHints->bInjectPowUnitsStateMaskChange);
 	SrvInitParamGetBOOL(INITPARAM_NO_DEVICE,          pvParamState,  HWValEnableSPUPowerMaskChange, psHints->bEnablePowUnitsStateMaskChange);
 	SrvInitParamGetUINT32(INITPARAM_NO_DEVICE,        pvParamState,  FBCDCVersionOverride,                psHints->ui32FBCDCVersionOverride);
@@ -447,8 +450,6 @@ static INLINE void GetFWConfigFlags(PVRSRV_DEVICE_NODE *psDeviceNode,
 #endif
 #endif
 		ui32FWConfigFlags |= psHints->bHWPerfDisableCounterFilter ? RGXFWIF_INICFG_HWP_DISABLE_FILTER : 0;
-		ui32FWConfigFlags |= (psHints->eFirmwarePerf == FW_PERF_CONF_CUSTOM_TIMER) ? RGXFWIF_INICFG_CUSTOM_PERF_TIMER_EN : 0;
-		ui32FWConfigFlags |= (psHints->eFirmwarePerf == FW_PERF_CONF_POLLS) ? RGXFWIF_INICFG_POLL_COUNTERS_EN : 0;
 		ui32FWConfigFlags |= (psHints->ui32FWContextSwitchProfile << RGXFWIF_INICFG_CTXSWITCH_PROFILE_SHIFT) & RGXFWIF_INICFG_CTXSWITCH_PROFILE_MASK;
 
 #if defined(SUPPORT_VALIDATION)
@@ -1290,7 +1291,7 @@ PVRSRV_ERROR RGXInit(PVRSRV_DEVICE_NODE *psDeviceNode)
 	RGX_SRVINIT_APPHINTS sApphints = {0};
 	IMG_UINT32 ui32FWConfigFlags, ui32FWConfigFlagsExt, ui32FwOsCfgFlags;
 	IMG_UINT32 ui32DeviceFlags;
-	IMG_UINT32 ui32AvailablePowUnitsMask;
+	IMG_UINT32 ui32AvailablePowUnitsMask, ui32AvailableRACMask;
 
 	PVRSRV_RGXDEV_INFO *psDevInfo = (PVRSRV_RGXDEV_INFO *)psDeviceNode->pvDevice;
 
@@ -1446,8 +1447,10 @@ PVRSRV_ERROR RGXInit(PVRSRV_DEVICE_NODE *psDeviceNode)
 
 #if defined(SUPPORT_VALIDATION)
 	ui32AvailablePowUnitsMask = sApphints.ui32AvailablePowUnitsMask;
+	ui32AvailableRACMask = sApphints.ui32AvailableRACMask;
 #else
 	ui32AvailablePowUnitsMask = AVAIL_POW_UNITS_MASK_DEFAULT;
+	ui32AvailableRACMask = AVAIL_RAC_MASK_DEFAULT;
 #endif
 
 	eError = RGXInitFirmware(psDeviceNode,
@@ -1477,6 +1480,7 @@ PVRSRV_ERROR RGXInit(PVRSRV_DEVICE_NODE *psDeviceNode)
 	                         sApphints.ui32KCCBSizeLog2,
 	                         ui32FWConfigFlagsExt,
 	                         ui32AvailablePowUnitsMask,
+							 ui32AvailableRACMask,
 	                         ui32FwOsCfgFlags);
 
 	if (eError != PVRSRV_OK)
@@ -1507,7 +1511,8 @@ PVRSRV_ERROR RGXInit(PVRSRV_DEVICE_NODE *psDeviceNode)
 	                         ui32DeviceFlags,
 	                         sApphints.ui32HWPerfHostFilter,
 	                         sApphints.eRGXActivePMConf,
-	                         ui32AvailablePowUnitsMask);
+	                         ui32AvailablePowUnitsMask,
+							 ui32AvailableRACMask);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,

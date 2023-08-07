@@ -60,7 +60,13 @@
  */
 #define TC_EXT_MINIMUM_MEM_SIZE (10*1024*1024)
 
-#if defined(SUPPORT_ION)
+#if defined(SUPPORT_DMA_HEAP)
+ #if defined(SUPPORT_FAKE_SECURE_DMA_HEAP)
+  #define TC_DMA_HEAP_COUNT 3
+ #else
+  #define TC_DMA_HEAP_COUNT 2
+ #endif
+#elif defined(SUPPORT_ION)
  #if defined(SUPPORT_RGX) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0))
   #define TC_ION_HEAP_BASE_COUNT 3
  #else
@@ -136,7 +142,8 @@ struct tc_device {
 	unsigned int dma_nchan;
 	struct mutex dma_mutex;
 
-#if defined(SUPPORT_FAKE_SECURE_ION_HEAP)
+#if defined(SUPPORT_FAKE_SECURE_ION_HEAP) || \
+	defined(SUPPORT_FAKE_SECURE_DMA_HEAP)
 	resource_size_t secure_heap_mem_base;
 	resource_size_t secure_heap_mem_size;
 #endif
@@ -154,13 +161,15 @@ struct tc_device {
 	struct timer_list timer;
 #endif
 
-#if defined(SUPPORT_ION)
+#if defined(SUPPORT_DMA_HEAP)
+	struct dma_heap *dma_heaps[TC_DMA_HEAP_COUNT];
+#elif defined(SUPPORT_ION)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0))
 	struct ion_device *ion_device;
 #endif
 	struct ion_heap *ion_heaps[TC_ION_HEAP_COUNT];
 	int ion_heap_count;
-#endif
+#endif /* defined(SUPPORT_ION) */
 
 	bool fbc_bypass;
 

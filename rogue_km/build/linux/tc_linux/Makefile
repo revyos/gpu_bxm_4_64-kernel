@@ -40,8 +40,6 @@
 
 RGX_BVNC ?= 1.82.4.5
 
-USE_LTO ?= 1
-
 include ../config/preconfig.mk
 include ../config/window_system.mk
 

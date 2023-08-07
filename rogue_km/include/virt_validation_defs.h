@@ -1,6 +1,8 @@
 /*************************************************************************/ /*!
-@Title          RGX Core BVNC 36.60.54.280
+@File
+@Title          Definitions for virtualization
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
+@Description    Services shared header for virtualization definitions
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -39,36 +41,23 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef RGXCORE_KM_36_60_54_280_H
-#define RGXCORE_KM_36_60_54_280_H
+#ifndef SRV_VIRT_DEFS_H
+#define SRV_VIRT_DEFS_H
 
-/* Automatically generated file (30/06/2021 09:01:21): Do not edit manually */
-/* CS: @6040409 */
+#if !defined(GPUVIRT_VALIDATION_MAX_STRING_LENGTH)
+	#define GPUVIRT_VALIDATION_MAX_STRING_LENGTH 512
+#endif
 
-/******************************************************************************
- * BVNC = 36.60.54.280
- *****************************************************************************/
-#define RGX_BVNC_KM_B 36
-#define RGX_BVNC_KM_V 60
-#define RGX_BVNC_KM_N 54
-#define RGX_BVNC_KM_C 280
+#define GPUVIRT_VALIDATION_MAX_OS 8
 
-/******************************************************************************
- * Errata
- *****************************************************************************/
+#define GPUVIRT_VALIDATION_NUM_REGIONS 2
+#define GPUVIRT_VAL_REGION_SECURE 0
+#define GPUVIRT_VAL_REGION_SHARED 1
 
-#define FIX_HW_BRN_63553
+/* Shared region 1MB */
+#define GPUVIRT_SIZEOF_SHARED 0x100000
 
+/* Min region size 64MB */
+#define GPUVIRT_MIN_SIZE 0x4000000
 
-
-/******************************************************************************
- * Enhancements
- *****************************************************************************/
-#define HW_ERN_42290
-#define HW_ERN_42606
-#define HW_ERN_47025
-#define HW_ERN_57596
-
-
-
-#endif /* RGXCORE_KM_36_60_54_280_H */
+#endif /* SRV_VIRT_DEFS_H */

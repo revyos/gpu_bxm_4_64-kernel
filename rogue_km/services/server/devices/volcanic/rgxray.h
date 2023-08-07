@@ -70,6 +70,8 @@ PVRSRV_ERROR PVRSRVRGXCreateRayContextKM(CONNECTION_DATA		*psConnection,
 										 IMG_UINT32				ui32ContextFlags,
 										 IMG_UINT32				ui32StaticRayContextStateSize,
 										 IMG_PBYTE				pStaticRayContextState,
+										 IMG_UINT64				ui64RobustnessAddress,
+										 IMG_UINT32				ui32MaxDeadlineMS,
 										 RGX_SERVER_RAY_CONTEXT	**ppsRayContext);
 
 /*!
@@ -94,7 +96,6 @@ PVRSRV_ERROR PVRSRVRGXDestroyRayContextKM(RGX_SERVER_RAY_CONTEXT *psRayContext);
  @Return   PVRSRV_ERROR
 ******************************************************************************/
 PVRSRV_ERROR PVRSRVRGXKickRDMKM(RGX_SERVER_RAY_CONTEXT	*psRayContext,
-								IMG_UINT32				ui32ClientCacheOpSeqNum,
 								IMG_UINT32				ui32ClientUpdateCount,
 								SYNC_PRIMITIVE_BLOCK	**pauiClientUpdateUFODevVarBlock,
 								IMG_UINT32				*paui32ClientUpdateSyncOffset,

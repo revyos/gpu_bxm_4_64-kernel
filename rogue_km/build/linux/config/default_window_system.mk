@@ -42,4 +42,3 @@
 
 WINDOW_SYSTEM ?= wayland
 MESA_EGL ?= 1
-MESA_WSI ?= 1

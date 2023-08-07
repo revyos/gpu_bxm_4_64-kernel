@@ -93,6 +93,7 @@ static PVRSRV_ERROR _FWDumpSignatureBufferKM(CONNECTION_DATA * psConnection,
 								 0,
 								 ui32PDumpFlags);
 
+#if defined(RGX_FEATURE_TDM_PDS_CHECKSUM_BIT_MASK)
 	if (RGX_IS_FEATURE_SUPPORTED(psDevInfo, TDM_PDS_CHECKSUM))
 	{
 		/* TDM signatures */
@@ -104,6 +105,7 @@ static PVRSRV_ERROR _FWDumpSignatureBufferKM(CONNECTION_DATA * psConnection,
 									 0,
 									 ui32PDumpFlags);
 	}
+#endif
 
 	PDUMPFI(psDeviceNode, "DISABLE_SIGNATURE_BUFFER_DUMP", ui32PDumpFlags);
 
@@ -219,6 +221,7 @@ static PVRSRV_ERROR _MipsDumpSignatureBufferKM(CONNECTION_DATA * psConnection,
 								 "out.3dsig",
 								 0);
 
+#if defined(RGX_FEATURE_TDM_PDS_CHECKSUM_BIT_MASK)
 	if (RGX_IS_FEATURE_SUPPORTED(psDevInfo, TDM_PDS_CHECKSUM))
 	{
 		/* TDM signatures */
@@ -229,6 +232,7 @@ static PVRSRV_ERROR _MipsDumpSignatureBufferKM(CONNECTION_DATA * psConnection,
 									 "out.tdmsig",
 									 0);
 	}
+#endif
 
 	return PVRSRV_OK;
 }
@@ -448,12 +452,14 @@ PVRSRV_ERROR RGXPDumpPrepareOutputImageDescriptorHdr(PVRSRV_DEVICE_NODE *psDevic
 									PDUMP_FBC_SWIZZLE eFBCSwizzle,
 									IMG_PBYTE pbyPDumpImageHdr)
 {
-	PVRSRV_RGXDEV_INFO *psDevInfo = psDeviceNode->pvDevice;
 	IMG_PUINT32 pui32Word;
 	IMG_UINT32 ui32HeaderDataSize;
 
+#if defined(RGX_FEATURE_TFBC_LOSSY_37_PERCENT_BIT_MASK) || defined(RGX_FEATURE_TFBC_DELTA_CORRELATION_BIT_MASK) || defined(RGX_FEATURE_TFBC_NATIVE_YUV10_BIT_MASK)
+	PVRSRV_RGXDEV_INFO *psDevInfo = psDeviceNode->pvDevice;
 	IMG_UINT32 ui32TFBCControl = (psDevInfo->psRGXFWIfFwSysData->ui32ConfigFlagsExt & RGXFWIF_INICFG_EXT_TFBC_CONTROL_MASK) >>
 																					  RGXFWIF_INICFG_EXT_TFBC_CONTROL_SHIFT;
+#endif
 
 	/* Validate parameters */
 	if (((IMAGE_HEADER_SIZE & ~(HEADER_WORD1_SIZE_CLRMSK >> HEADER_WORD1_SIZE_SHIFT)) != 0) ||
@@ -461,6 +467,8 @@ PVRSRV_ERROR RGXPDumpPrepareOutputImageDescriptorHdr(PVRSRV_DEVICE_NODE *psDevic
 	{
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
+
+	memset(pbyPDumpImageHdr, 0, IMAGE_HEADER_SIZE);
 
 	pui32Word = IMG_OFFSET_ADDR(pbyPDumpImageHdr, 0);
 	pui32Word[0] = (IMAGE_HEADER_TYPE << HEADER_WORD0_TYPE_SHIFT);
@@ -588,6 +596,7 @@ PVRSRV_ERROR RGXPDumpPrepareOutputImageDescriptorHdr(PVRSRV_DEVICE_NODE *psDevic
 	pui32Word[12] = paui32FBCClearColour[2];
 	pui32Word[13] = paui32FBCClearColour[3];
 
+#if defined(RGX_FEATURE_TFBC_LOSSY_37_PERCENT_BIT_MASK)
 	if (RGX_IS_FEATURE_SUPPORTED(psDevInfo, TFBC_LOSSY_37_PERCENT))
 	{
 		/* Should match current value of RGX_CR_TFBC_COMPRESSION_CONTROL_GROUP */
@@ -604,10 +613,12 @@ PVRSRV_ERROR RGXPDumpPrepareOutputImageDescriptorHdr(PVRSRV_DEVICE_NODE *psDevic
 		}
 	}
 	else
+#endif
 	{
 		pui32Word[14] = IMAGE_HEADER_WORD14_TFBC_GROUP_25_50_75;
 	}
 
+#if defined(RGX_FEATURE_TFBC_DELTA_CORRELATION_BIT_MASK)
 	if (RGX_IS_FEATURE_SUPPORTED(psDevInfo, TFBC_DELTA_CORRELATION))
 	{
 		/* Should match current value of RGX_CR_TFBC_COMPRESSION_CONTROL_SCHEME */
@@ -630,10 +641,23 @@ PVRSRV_ERROR RGXPDumpPrepareOutputImageDescriptorHdr(PVRSRV_DEVICE_NODE *psDevic
 		}
 	}
 	else
+#endif
 	{
 		/* Should always be set to 2 ("TFBC delta standard only") on cores without this feature */
 		pui32Word[14] |= IMAGE_HEADER_WORD14_COMP_SCHEME_D_STD_ONLY;
 	}
+
+#if defined(RGX_FEATURE_TFBC_NATIVE_YUV10_BIT_MASK)
+	if (RGX_IS_FEATURE_SUPPORTED(psDevInfo, TFBC_NATIVE_YUV10))
+	{
+		IMG_UINT32 ui32TFBCOverrideYUV10 = (ui32TFBCControl & RGX_CR_TFBC_COMPRESSION_CONTROL_YUV10_OVERRIDE_EN);
+
+		if (ui32TFBCOverrideYUV10)
+		{
+			pui32Word[14] |= IMAGE_HEADER_WORD14_YUV10_OPTIMAL_FMT_8_EN;
+		}
+	}
+#endif
 
 	return PVRSRV_OK;
 }

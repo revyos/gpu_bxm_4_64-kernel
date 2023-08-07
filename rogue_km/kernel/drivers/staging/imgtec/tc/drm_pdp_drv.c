@@ -248,7 +248,9 @@ static int pdp_early_load(struct drm_device *dev)
 	}
 #endif
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
 	dev->irq_enabled = true;
+#endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0))
 	dev->vblank_disable_allowed = 1;
@@ -550,28 +552,6 @@ static int pdp_gem_dumb_create(struct drm_file *file,
 					dev_priv->gem_priv,
 					args);
 }
-
-static void pdp_gem_object_free(struct drm_gem_object *obj)
-{
-	struct pdp_drm_private *dev_priv = obj->dev->dev_private;
-
-	pdp_gem_object_free_priv(dev_priv->gem_priv, obj);
-}
-
-static const struct vm_operations_struct pdp_gem_vm_ops = {
-	.fault	= pdp_gem_object_vm_fault,
-	.open	= drm_gem_vm_open,
-	.close	= drm_gem_vm_close,
-};
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0))
-const struct drm_gem_object_funcs pdp_gem_funcs = {
-	.export = pdp_gem_prime_export,
-	.free = pdp_gem_object_free,
-	.vm_ops = &pdp_gem_vm_ops,
-};
-#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0) */
-
 
 static const struct drm_ioctl_desc pdp_ioctls[] = {
 	DRM_IOCTL_DEF_DRV(PDP_GEM_CREATE, pdp_gem_object_create_ioctl,

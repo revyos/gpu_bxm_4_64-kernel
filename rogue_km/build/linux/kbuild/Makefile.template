@@ -76,6 +76,10 @@ ccflags-y += -D__linux__ -include $(OUT)/config_kernel.h \
  -include kernel_config_compatibility.h \
  -I$(OUT)/include -I$(TOP)/kernel/drivers/staging/imgtec
 
+ifeq ($(DEFINE_X86_FEATURE_LA57),1)
+ ccflags-$(CONFIG_X86) += -include $(KERNELDIR)/arch/x86/include/asm/cpufeatures.h
+endif
+
 include $(INTERNAL_KBUILD_MAKEFILES)
 
 define add-file-cflags

@@ -119,3 +119,13 @@ CONFIG_DRM_FBDEV_EMULATION option.))
   endif
  endif
 endif
+
+# MODPOST fails for out-of-tree modules with kernels >=5.13 and <5.17.
+# This is because there is an implicit dependency to asm/cpufeatures.h
+# added upstream at 025768a966a3dde8455de46d1f121a51bacb6a77 and fixed
+# at e1cd82a339024beda8439fb2e20718363ee989a8.
+ifeq ($(call kernel-version-at-least,5,13),true)
+ ifneq ($(call kernel-version-at-least,5,17),true)
+  $(eval $(call KernelConfigMake,DEFINE_X86_FEATURE_LA57,1))
+ endif
+endif

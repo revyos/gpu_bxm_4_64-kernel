@@ -1560,6 +1560,7 @@ pvr_sync_finalise_fence(PVRSRV_FENCE fence_fd, void *finalise_data)
  * in that fence. The OS native sync code needs to implement a function
  * meeting this specification.
  *
+ * Input: device                   Not currently used.
  * Input: fence_name               A string to annotate the fence with (for
  *                                 debug).
  * Input: timeline                 The timeline on which the new fence is to be
@@ -1571,7 +1572,8 @@ pvr_sync_finalise_fence(PVRSRV_FENCE fence_fd, void *finalise_data)
  * Output: new_checkpoint_handle   The PSYNC_CHECKPOINT used by the new fence.
  */
 static enum PVRSRV_ERROR_TAG
-pvr_sync_create_fence(const char *fence_name,
+pvr_sync_create_fence(struct _PVRSRV_DEVICE_NODE_ *device,
+		      const char *fence_name,
 		      PVRSRV_TIMELINE new_fence_timeline,
 		      PSYNC_CHECKPOINT_CONTEXT psSyncCheckpointContext,
 		      PVRSRV_FENCE *new_fence,
@@ -1920,15 +1922,15 @@ err_out:
 #if defined(PDUMP)
 static enum PVRSRV_ERROR_TAG
 pvr_sync_fence_get_checkpoints(PVRSRV_FENCE fence_to_pdump, u32 *nr_checkpoints,
-				struct _SYNC_CHECKPOINT ***checkpoint_handles)
+				struct SYNC_CHECKPOINT_TAG ***checkpoint_handles)
 {
 	enum PVRSRV_ERROR_TAG err;
 	struct sync_fence *sync_fence;
 	struct sync_pt *sync_pt;
 	struct pvr_sync_kernel_pair *sync_kernel;
 	u32 points_on_fence = 0;
-	struct _SYNC_CHECKPOINT **next_checkpoint;
-	struct _SYNC_CHECKPOINT **checkpoints = NULL;
+	struct SYNC_CHECKPOINT_TAG **next_checkpoint;
+	struct SYNC_CHECKPOINT_TAG **checkpoints = NULL;
 	int j = 0;
 
 	if (!nr_checkpoints || !checkpoint_handles) {

@@ -625,6 +625,7 @@ PVRSRV_ERROR RGXStop(const void *hPrivate)
 #define RGX_CR_POWER_EVENT_GPU_ID_CLRMSK                  (IMG_UINT64_C(0xFFFFFFFFFFFFFF1F))
 #define RGX_CR_POWER_EVENT_DOMAIN_SPU0_SHIFT              (9U)
 #define RGX_CR_POWER_EVENT_DOMAIN_CLUSTER0_SHIFT          (8U)
+#define RGX_CR_POWER_EVENT_DOMAIN_CLUSTER_CLUSTER0_SHIFT  (32U)
 #define RGX_CR_POWER_EVENT_TYPE_SHIFT                     (0U)
 #define RGX_CR_POWER_EVENT_TYPE_POWER_DOWN                (0x00000000U)
 #define RGX_CR_POWER_EVENT_REQ_EN                         (0x00000002U)
@@ -633,7 +634,26 @@ PVRSRV_ERROR RGXStop(const void *hPrivate)
 	/* Power off any enabled SPUs */
 	if (BITMASK_HAS(psDevInfo->ui32DeviceFlags, RGXKM_DEVICE_STATE_ENABLE_SPU_UNITS_POWER_MASK_CHANGE_EN))
 	{
-		if (RGX_DEVICE_GET_FEATURE_VALUE(hPrivate, POWER_ISLAND_VERSION) == 2)
+		if (RGX_DEVICE_GET_FEATURE_VALUE(hPrivate, POWER_ISLAND_VERSION) == 3)
+		{
+			IMG_UINT64 ui64PowUnitOffMask;
+			IMG_UINT64 ui64RegVal;
+
+			ui64PowUnitOffMask = (1 << RGX_DEVICE_GET_FEATURE_VALUE(hPrivate, NUM_CLUSTERS)) -1;
+			ui64RegVal = (~RGX_CR_POWER_EVENT_GPU_MASK_CLRMSK) | // GPU_MASK specifies all cores
+			             (~RGX_CR_POWER_EVENT_GPU_ID_CLRMSK) | // GPU_ID all set means use the GPU_MASK
+			             (ui64PowUnitOffMask << RGX_CR_POWER_EVENT_DOMAIN_CLUSTER_CLUSTER0_SHIFT) |
+			             RGX_CR_POWER_EVENT_TYPE_POWER_DOWN;
+
+			RGXWriteReg64(hPrivate,
+			              RGX_CR_POWER_EVENT,
+			              ui64RegVal);
+
+			RGXWriteReg64(hPrivate,
+			              RGX_CR_POWER_EVENT,
+			              ui64RegVal | RGX_CR_POWER_EVENT_REQ_EN);
+		}
+		else if (RGX_DEVICE_GET_FEATURE_VALUE(hPrivate, POWER_ISLAND_VERSION) == 2)
 		{
 			IMG_UINT64 ui64PowUnitOffMask;
 			IMG_UINT64 ui64RegVal;

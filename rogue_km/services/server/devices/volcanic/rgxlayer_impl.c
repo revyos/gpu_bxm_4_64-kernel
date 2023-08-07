@@ -715,11 +715,11 @@ PVRSRV_ERROR RGXFabricCoherencyTest(const void *hPrivate)
 					ui32FWValue = i + ui32OddEvenSeed;
 
 					/* Write the value using the RGX slave-port interface */
-					eError = RGXWriteMETAAddr(psDevInfo, ui32FWAddr, ui32FWValue);
+					eError = RGXWriteFWModuleAddr(psDevInfo, ui32FWAddr, ui32FWValue);
 					if (eError != PVRSRV_OK)
 					{
 						PVR_DPF((PVR_DBG_ERROR,
-								"RGXWriteMETAAddr error: %s, exiting",
+								"RGXWriteFWModuleAddr error: %s, exiting",
 								 PVRSRVGetErrorString(eError)));
 						bExit = IMG_TRUE;
 						continue;
@@ -727,11 +727,11 @@ PVRSRV_ERROR RGXFabricCoherencyTest(const void *hPrivate)
 
 					/* Read back value using RGX slave-port interface, this is used
 					   as a sort of memory barrier for the above write */
-					eError = RGXReadMETAAddr(psDevInfo, ui32FWAddr, &ui32FWValue2);
+					eError = RGXReadFWModuleAddr(psDevInfo, ui32FWAddr, &ui32FWValue2);
 					if (eError != PVRSRV_OK)
 					{
 						PVR_DPF((PVR_DBG_ERROR,
-								"RGXReadMETAAddr error: %s, exiting",
+								"RGXReadFWModuleAddr error: %s, exiting",
 								 PVRSRVGetErrorString(eError)));
 						bExit = IMG_TRUE;
 						continue;
@@ -739,7 +739,7 @@ PVRSRV_ERROR RGXFabricCoherencyTest(const void *hPrivate)
 					else if (ui32FWValue != ui32FWValue2)
 					{
 						//IMG_UINT32 ui32FWValue3;
-						//RGXReadMETAAddr(psDevInfo, 0xC1F00000, &ui32FWValue3);
+						//RGXReadFWModuleAddr(psDevInfo, 0xC1F00000, &ui32FWValue3);
 
 						/* Fatal error, we should abort */
 						PVR_DPF((PVR_DBG_ERROR,
@@ -774,7 +774,7 @@ PVRSRV_ERROR RGXFabricCoherencyTest(const void *hPrivate)
 					pui32FabricCohTestBufferCpuVA[i] = i + ui32OddEvenSeed;
 
 					/* Flush possible cpu store-buffer(ing) on LMA */
-					OSWriteMemoryBarrier();
+					OSWriteMemoryBarrier(&pui32FabricCohTestBufferCpuVA[i]);
 
 					switch (eTestType)
 					{
@@ -788,7 +788,7 @@ PVRSRV_ERROR RGXFabricCoherencyTest(const void *hPrivate)
 					}
 
 					/* Read back value using RGX slave-port interface */
-					eError = RGXReadMETAAddr(psDevInfo, ui32FWAddr, &ui32FWValue);
+					eError = RGXReadFWModuleAddr(psDevInfo, ui32FWAddr, &ui32FWValue);
 					if (eError != PVRSRV_OK)
 					{
 						PVR_DPF((PVR_DBG_ERROR,

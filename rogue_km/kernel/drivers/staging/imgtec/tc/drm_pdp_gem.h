@@ -63,6 +63,7 @@
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0))
 extern const struct drm_gem_object_funcs pdp_gem_funcs;
 #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0) */
+extern const struct vm_operations_struct pdp_gem_vm_ops;
 
 struct pdp_gem_private;
 
@@ -113,6 +114,8 @@ struct drm_gem_object *pdp_gem_object_create(struct drm_device *dev,
 
 void pdp_gem_object_free_priv(struct pdp_gem_private *gem_priv,
 			      struct drm_gem_object *obj);
+
+void pdp_gem_object_free(struct drm_gem_object *obj);
 
 struct dma_buf *pdp_gem_prime_export(
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))

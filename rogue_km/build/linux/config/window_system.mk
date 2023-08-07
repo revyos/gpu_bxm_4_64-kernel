@@ -92,8 +92,7 @@ endef
 $(call WindowSystemTunableOption,EGL_EXTENSION_ANDROID_NATIVE_FENCE_SYNC,)
 $(call WindowSystemTunableOption,GBM_BACKEND,$(if $(MESA_EGL),,nulldrmws))
 $(call WindowSystemTunableOption,MESA_EGL,nulldrmws)
-$(call WindowSystemTunableOption,MESA_WSI,\
-		lws-generic nulldrmws surfaceless wayland xorg)
+$(call WindowSystemTunableOption,MESA_WSI,nulldrmws)
 $(call WindowSystemTunableOption,SC_EGL,nullws nulldrmws)
 $(call WindowSystemTunableOption,SERVICES_SC,nullws nulldrmws)
 $(call WindowSystemTunableOption,OPK_DEFAULT,)
@@ -117,18 +116,18 @@ ifneq ($(MESA_EGL),1)
  # Tests of MESA_EGL are against the value 1 and the empty string, so values
  # other than 1, such as 0, should be mapped to the empty string.
  override undefine MESA_EGL
+else
+ # MESA_WSI defaults to the same value as MESA_EGL.
+ MESA_WSI ?= 1
 endif
 
 ifneq ($(filter lws-generic surfaceless,$(WINDOW_SYSTEM)),)
  ifeq ($(SUPPORT_VK_PLATFORMS),)
-  ifeq ($(MESA_WSI),1)
-   override undefine MESA_WSI
-  endif
+  # There is no point building Mesa WSI if no platforms have been selected.
+  override undefine MESA_WSI
  else
-  MESA_WSI ?= 1
+  override MESA_WSI := 1
  endif
-else ifneq ($(filter wayland xorg,$(WINDOW_SYSTEM)),)
- MESA_WSI ?= 1
 endif
 
 ifneq ($(MESA_WSI),1)
@@ -139,6 +138,7 @@ endif
 
 ifeq ($(WINDOW_SYSTEM),xorg)
  override MESA_EGL := 1
+ override MESA_WSI := 1
  SUPPORT_VK_PLATFORMS := x11
  SUPPORT_DISPLAY_CLASS := 0
  SUPPORT_NATIVE_FENCE_SYNC := 1
@@ -147,6 +147,7 @@ ifeq ($(WINDOW_SYSTEM),xorg)
  SUPPORT_ACTIVE_FLUSH := 1
 else ifeq ($(WINDOW_SYSTEM),wayland)
  override MESA_EGL := 1
+ override MESA_WSI := 1
  SUPPORT_VK_PLATFORMS := wayland
  SUPPORT_DISPLAY_CLASS := 0
  SUPPORT_NATIVE_FENCE_SYNC := 1

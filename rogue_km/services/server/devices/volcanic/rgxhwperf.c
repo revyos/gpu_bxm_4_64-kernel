@@ -308,7 +308,6 @@ PVRSRV_ERROR PVRSRVRGXConfigureHWPerfBlocksKM(
 	eError = RGXScheduleCommandAndGetKCCBSlot(psDevice,
 											  RGXFWIF_DM_GP,
 											  &sKccbCmd,
-											  0,
 											  PDUMP_FLAGS_CONTINUOUS,
 											  &ui32kCCBCommandSlot);
 	PVR_LOG_GOTO_IF_ERROR(eError, "RGXScheduleCommandAndGetKCCBSlot", fail2);

@@ -54,7 +54,11 @@
 
 #include "tc_drv_internal.h"
 #include "tc_odin.h"
+#if defined(SUPPORT_DMA_HEAP)
+#include "tc_dmabuf_heap.h"
+#elif defined(SUPPORT_ION)
 #include "tc_ion.h"
+#endif
 
 /* Odin (3rd gen TCF FPGA) */
 #include "odin_defs.h"
@@ -1518,13 +1522,19 @@ static int odin_dev_init(struct tc_device *tc, struct pci_dev *pdev,
 	tc->secure_heap_mem_size = secure_mem_size;
 #endif
 
-#if defined(SUPPORT_ION)
+#if defined(SUPPORT_DMA_HEAP)
+	err = tc_dmabuf_heap_init(tc, ODN_DDR_BAR);
+	if (err) {
+		dev_err(&pdev->dev, "Failed to initialise ION\n");
+		goto err_odin_unmap_sys_registers;
+	}
+#elif defined(SUPPORT_ION)
 	err = tc_ion_init(tc, ODN_DDR_BAR);
 	if (err) {
 		dev_err(&pdev->dev, "Failed to initialise ION\n");
 		goto err_odin_unmap_sys_registers;
 	}
-#endif
+#endif /* defined(SUPPORT_ION) */
 
 	/* CDMA initialisation */
 	val = ioread32(tc->tcf.registers + ODN_CORE_SUPPORTED_FEATURES);
@@ -1576,7 +1586,9 @@ err_odin_unmap_sys_registers:
 
 static void odin_dev_cleanup(struct tc_device *tc)
 {
-#if defined(SUPPORT_ION)
+#if defined(SUPPORT_DMA_HEAP)
+	tc_dmabuf_heap_deinit(tc, ODN_DDR_BAR);
+#elif defined(SUPPORT_ION)
 	tc_ion_deinit(tc, ODN_DDR_BAR);
 #endif
 

@@ -104,6 +104,8 @@ PVRSRV_ERROR PVRSRVRGXCreateRayContextKM(CONNECTION_DATA			*psConnection,
 											 IMG_UINT32				ui32ContextFlags,
 											 IMG_UINT32				ui32StaticRayContextStateSize,
 											 IMG_PBYTE				pStaticRayContextState,
+											 IMG_UINT64				ui64RobustnessAddress,
+											 IMG_UINT32				ui32MaxDeadlineMS,
 											 RGX_SERVER_RAY_CONTEXT	**ppsRayContext)
 {
 	DEVMEM_MEMDESC				*psFWMemContextMemDesc = RGXGetFWMemDescFromMemoryContextHandle(hMemCtxPrivData);
@@ -168,8 +170,8 @@ PVRSRV_ERROR PVRSRVRGXCreateRayContextKM(CONNECTION_DATA			*psConnection,
 									 RGX_RDM_CCB_MAX_SIZE_LOG2,
 									 ui32ContextFlags,
 									 ui32Priority,
-									 UINT_MAX,
-									 0,
+									 ui32MaxDeadlineMS,
+									 ui64RobustnessAddress,
 									 &sInfo,
 									 &psRayContext->psServerCommonContext);
 	if (eError != PVRSRV_OK)
@@ -249,7 +251,6 @@ PVRSRV_ERROR PVRSRVRGXDestroyRayContextKM(RGX_SERVER_RAY_CONTEXT *psRayContext)
 
 
 PVRSRV_ERROR PVRSRVRGXKickRDMKM(RGX_SERVER_RAY_CONTEXT	*psRayContext,
-								IMG_UINT32				ui32ClientCacheOpSeqNum,
 								IMG_UINT32				ui32ClientUpdateCount,
 								SYNC_PRIMITIVE_BLOCK	**pauiClientUpdateUFODevVarBlock,
 								IMG_UINT32				*paui32ClientUpdateSyncOffset,
@@ -578,7 +579,8 @@ PVRSRV_ERROR PVRSRVRGXKickRDMKM(RGX_SERVER_RAY_CONTEXT	*psRayContext,
 		}
 	}
 
-	RGXCmdHelperInitCmdCCB(psClientCCB,
+	RGXCmdHelperInitCmdCCB(psDevInfo,
+	                       psClientCCB,
 	                       ui64FBSCEntryMask,
 	                       ui32IntClientFenceCount,
 	                       pauiIntFenceUFOAddress,
@@ -628,6 +630,20 @@ PVRSRV_ERROR PVRSRVRGXKickRDMKM(RGX_SERVER_RAY_CONTEXT	*psRayContext,
 
 	ui32FWCtx = FWCommonContextGetFWAddress(psRayContext->psServerCommonContext).ui32Addr;
 
+	RGXSRV_HWPERF_ENQ(psRayContext,
+	                  OSGetCurrentClientProcessIDKM(),
+	                  ui32FWCtx,
+	                  ui32ExtJobRef,
+	                  ui32IntJobRef,
+	                  RGX_HWPERF_KICK_TYPE_RS,
+	                  iCheckFence,
+	                  iUpdateFence,
+	                  iUpdateTimeline,
+	                  uiCheckFenceUID,
+	                  uiUpdateFenceUID,
+	                  NO_DEADLINE,
+	                  NO_CYCEST);
+
 	/*
 	 * Submit the compute command to the firmware.
 	 */
@@ -636,7 +652,6 @@ PVRSRV_ERROR PVRSRVRGXKickRDMKM(RGX_SERVER_RAY_CONTEXT	*psRayContext,
 		eError2 = RGXScheduleCommand(psRayContext->psDeviceNode->pvDevice,
 									RGXFWIF_DM_RAY,
 									&sRayKCCBCmd,
-									ui32ClientCacheOpSeqNum,
 									ui32PDumpFlags);
 		if (eError2 != PVRSRV_ERROR_RETRY)
 		{
@@ -658,11 +673,9 @@ PVRSRV_ERROR PVRSRVRGXKickRDMKM(RGX_SERVER_RAY_CONTEXT	*psRayContext,
 	}
 	else
 	{
-		/*
 		PVRGpuTraceEnqueueEvent(psRayContext->psDeviceNode->pvDevice,
 		                        ui32FWCtx, ui32ExtJobRef, ui32IntJobRef,
-		                        RGX_HWPERF_KICK_TYPE_CDM);
-		*/
+		                        RGX_HWPERF_KICK_TYPE_RS);
 	}
 	/*
 	 * Now check eError (which may have returned an error from our earlier call

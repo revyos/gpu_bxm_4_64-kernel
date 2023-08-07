@@ -278,16 +278,14 @@ static struct devfreq_dev_profile img_devfreq_dev_profile =
 #endif
 };
 
-static int FillOPPTable(struct device *dev)
+static int FillOPPTable(struct device *dev, PVRSRV_DEVICE_NODE *psDeviceNode)
 {
 	const IMG_OPP *iopp;
 	int i, err = 0;
-	int deviceId = _device_get_devid(dev);
-	PVRSRV_DEVICE_NODE *psDeviceNode = PVRSRVGetDeviceInstanceByOSId(deviceId);
 	IMG_DVFS_DEVICE_CFG *psDVFSDeviceCfg = NULL;
 
-	/* Check the device is registered */
-	if (!psDeviceNode)
+	/* Check the device exists */
+	if (!dev || !psDeviceNode)
 	{
 		return -ENODEV;
 	}
@@ -308,18 +306,16 @@ static int FillOPPTable(struct device *dev)
 	return 0;
 }
 
-static void ClearOPPTable(struct device *dev)
+static void ClearOPPTable(struct device *dev, PVRSRV_DEVICE_NODE *psDeviceNode)
 {
 #if (defined(CHROMIUMOS_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))) || \
 	(LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0))
 	const IMG_OPP *iopp;
 	int i;
-	int deviceId = _device_get_devid(dev);
-	PVRSRV_DEVICE_NODE *psDeviceNode = PVRSRVGetDeviceInstanceByOSId(deviceId);
 	IMG_DVFS_DEVICE_CFG *psDVFSDeviceCfg = NULL;
 
-	/* Check the device is registered */
-	if (!psDeviceNode)
+	/* Check the device exists */
+	if (!dev || !psDeviceNode)
 	{
 		return;
 	}
@@ -488,10 +484,7 @@ PVRSRV_ERROR InitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
 {
 	IMG_DVFS_DEVICE        *psDVFSDevice = NULL;
 	IMG_DVFS_DEVICE_CFG    *psDVFSDeviceCfg = NULL;
-	IMG_DVFS_GOVERNOR_CFG  *psDVFSGovernorCfg = NULL;
-	RGX_TIMING_INFORMATION *psRGXTimingInfo = NULL;
 	struct device          *psDev;
-	unsigned long           min_freq = 0, max_freq = 0, min_volt = 0;
 	PVRSRV_ERROR            eError;
 	int                     err;
 
@@ -503,13 +496,13 @@ PVRSRV_ERROR InitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
 
 	if (!psDeviceNode)
 	{
-		return -ENODEV;
+		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
-	if (psDeviceNode->psDevConfig->sDVFS.sDVFSDevice.bReady)
+	if (psDeviceNode->psDevConfig->sDVFS.sDVFSDevice.bInitPending)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
-				 "DVFS already initialised for device node %p",
+				 "DVFS initialise pending for device node %p",
 				 psDeviceNode));
 		return PVRSRV_ERROR_INIT_FAILURE;
 	}
@@ -517,9 +510,7 @@ PVRSRV_ERROR InitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
 	psDev = psDeviceNode->psDevConfig->pvOSDevice;
 	psDVFSDevice = &psDeviceNode->psDevConfig->sDVFS.sDVFSDevice;
 	psDVFSDeviceCfg = &psDeviceNode->psDevConfig->sDVFS.sDVFSDeviceCfg;
-	psDVFSGovernorCfg = &psDeviceNode->psDevConfig->sDVFS.sDVFSGovernorCfg;
-	psRGXTimingInfo = ((RGX_DATA *)psDeviceNode->psDevConfig->hDevData)->psRGXTimingInfo;
-	psDeviceNode->psDevConfig->sDVFS.sDVFSDevice.bReady = IMG_TRUE;
+	psDeviceNode->psDevConfig->sDVFS.sDVFSDevice.bInitPending = IMG_TRUE;
 
 #if defined(SUPPORT_SOC_TIMER)
 	if (! psDeviceNode->psDevConfig->pfnSoCTimerRead)
@@ -555,7 +546,7 @@ PVRSRV_ERROR InitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
 
 	if (psDVFSDeviceCfg->pasOPPTable)
 	{
-		err = FillOPPTable(psDev);
+		err = FillOPPTable(psDev, psDeviceNode);
 		if (err)
 		{
 			PVR_DPF((PVR_DBG_ERROR, "Failed to fill OPP table with data, %d", err));
@@ -563,6 +554,48 @@ PVRSRV_ERROR InitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
 			goto err_exit;
 		}
 	}
+
+	PVR_TRACE(("PVR DVFS init pending: dev = %p, PVR device = %p",
+			   psDev, psDeviceNode));
+
+	return PVRSRV_OK;
+
+err_exit:
+	DeinitDVFS(psDeviceNode);
+	return eError;
+}
+
+PVRSRV_ERROR RegisterDVFSDevice(PPVRSRV_DEVICE_NODE psDeviceNode)
+{
+	IMG_DVFS_DEVICE        *psDVFSDevice = NULL;
+	IMG_DVFS_DEVICE_CFG    *psDVFSDeviceCfg = NULL;
+	IMG_DVFS_GOVERNOR_CFG  *psDVFSGovernorCfg = NULL;
+	RGX_TIMING_INFORMATION *psRGXTimingInfo = NULL;
+	struct device          *psDev;
+	unsigned long           min_freq = 0, max_freq = 0, min_volt = 0;
+	PVRSRV_ERROR            eError;
+	int                     err;
+
+	if (!psDeviceNode)
+	{
+		return PVRSRV_ERROR_INVALID_PARAMS;
+	}
+
+	if (!psDeviceNode->psDevConfig->sDVFS.sDVFSDevice.bInitPending)
+	{
+		PVR_DPF((PVR_DBG_ERROR,
+				 "DVFS initialise not yet pending for device node %p",
+				 psDeviceNode));
+		return PVRSRV_ERROR_INIT_FAILURE;
+	}
+
+	psDev = psDeviceNode->psDevConfig->pvOSDevice;
+	psDVFSDevice = &psDeviceNode->psDevConfig->sDVFS.sDVFSDevice;
+	psDVFSDeviceCfg = &psDeviceNode->psDevConfig->sDVFS.sDVFSDeviceCfg;
+	psDVFSGovernorCfg = &psDeviceNode->psDevConfig->sDVFS.sDVFSGovernorCfg;
+	psRGXTimingInfo = ((RGX_DATA *)psDeviceNode->psDevConfig->hDevData)->psRGXTimingInfo;
+	psDeviceNode->psDevConfig->sDVFS.sDVFSDevice.bInitPending = IMG_FALSE;
+	psDeviceNode->psDevConfig->sDVFS.sDVFSDevice.bReady = IMG_TRUE;
 
 	err = GetOPPValues(psDev, &min_freq, &min_volt, &max_freq);
 	if (err)
@@ -648,17 +681,17 @@ PVRSRV_ERROR InitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
 	return PVRSRV_OK;
 
 err_exit:
-	DeinitDVFS(psDeviceNode);
+	UnregisterDVFSDevice(psDeviceNode);
 	return eError;
 }
 
-void DeinitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
+void UnregisterDVFSDevice(PPVRSRV_DEVICE_NODE psDeviceNode)
 {
 	IMG_DVFS_DEVICE *psDVFSDevice = NULL;
 	struct device *psDev = NULL;
 	IMG_INT32 i32Error;
 
-	/* Check the device is registered */
+	/* Check the device exists */
 	if (!psDeviceNode)
 	{
 		return;
@@ -704,8 +737,28 @@ void DeinitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
 	kfree(img_devfreq_dev_profile.freq_table);
 #endif
 
+	psDVFSDevice->bInitPending = IMG_FALSE;
+	psDVFSDevice->bReady = IMG_FALSE;
+}
+
+void DeinitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
+{
+	IMG_DVFS_DEVICE *psDVFSDevice = NULL;
+	struct device *psDev = NULL;
+
+	/* Check the device exists */
+	if (!psDeviceNode)
+	{
+		return;
+	}
+
+	PVRSRV_VZ_RETN_IF_MODE(GUEST);
+
+	psDVFSDevice = &psDeviceNode->psDevConfig->sDVFS.sDVFSDevice;
+	psDev = psDeviceNode->psDevConfig->pvOSDevice;
+
 	/* Remove OPP entries for this device */
-	ClearOPPTable(psDev);
+	ClearOPPTable(psDev, psDeviceNode);
 
 #if defined(CONFIG_OF)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)) || \
@@ -716,6 +769,7 @@ void DeinitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode)
 
 	SORgxGpuUtilStatsUnregister(psDVFSDevice->hGpuUtilUserDVFS);
 	psDVFSDevice->hGpuUtilUserDVFS = NULL;
+	psDVFSDevice->bInitPending = IMG_FALSE;
 	psDVFSDevice->bReady = IMG_FALSE;
 }
 

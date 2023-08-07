@@ -92,7 +92,7 @@ void SysDmaDeregisterForIoRemapping(DMA_ALLOC *psPhysHeapDmaAlloc);
 *******************************************************************************
  @Function      SysDmaDevPAddrToCpuVAddr
  @Description   Maps a DMA_ALLOC physical address to CPU virtual address
- @Return        PVRSRV_OK on success. Otherwise, a PVRSRV error code
+ @Return        IMG_CPU_VIRTADDR on success. Otherwise, a NULL
 ******************************************************************************/
 IMG_CPU_VIRTADDR
 SysDmaDevPAddrToCpuVAddr(IMG_UINT64 uiAddr, IMG_UINT64 ui64Size);

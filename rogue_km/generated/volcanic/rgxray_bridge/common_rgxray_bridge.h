@@ -67,9 +67,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /* Bridge in structure for RGXCreateRayContext */
 typedef struct PVRSRV_BRIDGE_IN_RGXCREATERAYCONTEXT_TAG
 {
+	IMG_UINT64 ui64RobustnessAddress;
 	IMG_HANDLE hPrivData;
 	IMG_BYTE *pui8sStaticRayContextState;
 	IMG_UINT32 ui32ContextFlags;
+	IMG_UINT32 ui32MaxDeadlineMS;
 	IMG_UINT32 ui32StaticRayContextStateSize;
 	IMG_UINT32 ui32ui32Priority;
 } __packed PVRSRV_BRIDGE_IN_RGXCREATERAYCONTEXT;
@@ -112,7 +114,6 @@ typedef struct PVRSRV_BRIDGE_IN_RGXKICKRDM_TAG
 	IMG_HANDLE *phClientUpdateUFOSyncPrimBlock;
 	PVRSRV_FENCE hCheckFenceFd;
 	PVRSRV_TIMELINE hUpdateTimeline;
-	IMG_UINT32 ui32ClientCacheOpSeqNum;
 	IMG_UINT32 ui32ClientUpdateCount;
 	IMG_UINT32 ui32CmdSize;
 	IMG_UINT32 ui32ExtJobRef;

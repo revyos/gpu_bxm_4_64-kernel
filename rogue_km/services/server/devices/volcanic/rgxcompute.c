@@ -203,9 +203,11 @@ fail_contextsuspendalloc:
 }
 
 static
-PVRSRV_ERROR _DestroyComputeContext(RGX_SERVER_CC_CMP_DATA *psComputeData,
-									PVRSRV_DEVICE_NODE *psDeviceNode)
+PVRSRV_ERROR _DestroyComputeContext(RGX_SERVER_COMPUTE_CONTEXT *psComputeContext)
 {
+	RGX_SERVER_CC_CMP_DATA *psComputeData = &psComputeContext->sComputeData;
+	PVRSRV_DEVICE_NODE *psDeviceNode = psComputeContext->psDeviceNode;
+	PVRSRV_RGXDEV_INFO *psDevInfo = psDeviceNode->pvDevice;
 	PVRSRV_ERROR eError;
 
 	/* Check if the FW has finished with this resource ... */
@@ -226,6 +228,12 @@ PVRSRV_ERROR _DestroyComputeContext(RGX_SERVER_CC_CMP_DATA *psComputeData,
 	}
 
 	/* ... it has so we can free its resources */
+
+	/* Remove from node list before freeing. */
+	OSWRLockAcquireWrite(psDevInfo->hComputeCtxListLock);
+	dllist_remove_node(&(psComputeContext->sListNode));
+	OSWRLockReleaseWrite(psDevInfo->hComputeCtxListLock);
+
 	FWCommonContextFree(psComputeData->psServerCommonContext);
 	DevmemFwUnmapAndFree(psDeviceNode->pvDevice, psComputeData->psContextStateMemDesc);
 	psComputeData->psServerCommonContext = NULL;
@@ -441,8 +449,7 @@ PVRSRV_ERROR PVRSRVRGXDestroyComputeContextKM(RGX_SERVER_COMPUTE_CONTEXT *psComp
 	}
 #endif
 
-	eError = _DestroyComputeContext(&psComputeContext->sComputeData,
-									psComputeContext->psDeviceNode);
+	eError = _DestroyComputeContext(psComputeContext);
 	if (eError != PVRSRV_OK)
 	{
 		return eError;
@@ -457,10 +464,6 @@ PVRSRV_ERROR PVRSRVRGXDestroyComputeContextKM(RGX_SERVER_COMPUTE_CONTEXT *psComp
 		psComputeContext->psBufferSyncContext = NULL;
 	}
 #endif
-
-	OSWRLockAcquireWrite(psDevInfo->hComputeCtxListLock);
-	dllist_remove_node(&(psComputeContext->sListNode));
-	OSWRLockReleaseWrite(psDevInfo->hComputeCtxListLock);
 
 #if defined(SUPPORT_WORKLOAD_ESTIMATION)
 	WorkEstDeInitCompute(psDevInfo, &psComputeContext->sWorkEstData);
@@ -480,7 +483,6 @@ PVRSRV_ERROR PVRSRVRGXDestroyComputeContextKM(RGX_SERVER_COMPUTE_CONTEXT *psComp
 
 
 PVRSRV_ERROR PVRSRVRGXKickCDMKM(RGX_SERVER_COMPUTE_CONTEXT	*psComputeContext,
-								IMG_UINT32					ui32ClientCacheOpSeqNum,
 								IMG_UINT32					ui32ClientUpdateCount,
 								SYNC_PRIMITIVE_BLOCK		**pauiClientUpdateUFODevVarBlock,
 								IMG_UINT32					*paui32ClientUpdateSyncOffset,
@@ -928,7 +930,8 @@ PVRSRV_ERROR PVRSRVRGXKickCDMKM(RGX_SERVER_COMPUTE_CONTEXT	*psComputeContext,
 			&sWorkloadKickDataCompute);
 #endif
 
-	RGXCmdHelperInitCmdCCB(psClientCCB,
+	RGXCmdHelperInitCmdCCB(psDevInfo,
+	                       psClientCCB,
 	                       ui64FBSCEntryMask,
 	                       ui32IntClientFenceCount,
 	                       pauiIntFenceUFOAddress,
@@ -1051,7 +1054,6 @@ PVRSRV_ERROR PVRSRVRGXKickCDMKM(RGX_SERVER_COMPUTE_CONTEXT	*psComputeContext,
 		eError2 = RGXScheduleCommand(psComputeContext->psDeviceNode->pvDevice,
 									RGXFWIF_DM_CDM,
 									&sCmpKCCBCmd,
-									ui32ClientCacheOpSeqNum,
 									ui32PDumpFlags);
 		if (eError2 != PVRSRV_ERROR_RETRY)
 		{
@@ -1211,7 +1213,6 @@ PVRSRV_ERROR PVRSRVRGXFlushComputeDataKM(RGX_SERVER_COMPUTE_CONTEXT *psComputeCo
 		eError = RGXScheduleCommandAndGetKCCBSlot(psDevInfo,
 									RGXFWIF_DM_CDM,
 									&sFlushCmd,
-									0,
 									PDUMP_FLAGS_CONTINUOUS,
 									&ui32kCCBCommandSlot);
 		/* Iterate if we hit a PVRSRV_ERROR_KERNEL_CCB_FULL error */
@@ -1279,7 +1280,6 @@ PVRSRV_ERROR PVRSRVRGXNotifyComputeWriteOffsetUpdateKM(RGX_SERVER_COMPUTE_CONTEX
 		eError = RGXScheduleCommand(psComputeContext->psDeviceNode->pvDevice,
 									RGXFWIF_DM_CDM,
 									&sKCCBCmd,
-									0,
 									PDUMP_FLAGS_NONE);
 		if (eError != PVRSRV_ERROR_RETRY)
 		{
@@ -1336,17 +1336,18 @@ PVRSRV_ERROR PVRSRVRGXSetComputeContextPropertyKM(RGX_SERVER_COMPUTE_CONTEXT *ps
                                                   IMG_UINT64 ui64Input,
                                                   IMG_UINT64 *pui64Output)
 {
-	PVRSRV_ERROR eError;
+	PVRSRV_ERROR eError = PVRSRV_OK;
 
 	switch (eContextProperty)
 	{
 		case RGX_CONTEXT_PROPERTY_FLAGS:
 		{
+			IMG_UINT32 ui32ContextFlags = (IMG_UINT32)ui64Input;
+
 			OSLockAcquire(psComputeContext->hLock);
 			eError = FWCommonContextSetFlags(psComputeContext->sComputeData.psServerCommonContext,
-			                                 (IMG_UINT32)ui64Input);
+			                                 ui32ContextFlags);
 			OSLockRelease(psComputeContext->hLock);
-			PVR_LOG_IF_ERROR(eError, "FWCommonContextSetFlags");
 			break;
 		}
 

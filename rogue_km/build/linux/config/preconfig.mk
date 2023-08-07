@@ -45,6 +45,14 @@
 
 TOP ?= $(abspath ../../..)
 
+BUILD ?= release
+
+ifneq ($(SUPPORT_NEUTRINO_PLATFORM),1)
+ ifneq ($(BUILD),debug)
+  USE_LTO ?= 1
+ endif
+endif
+
 # Some miscellaneous things to make comma substitutions easier.
 apos := '#'
 comma := ,
@@ -403,72 +411,121 @@ ifneq ($(INTERNAL_CLOBBER_ONLY),true)
 
 # If RGX_BVNC is not defined a valid PVR_ARCH has to be specified
 ifeq ($(RGX_BVNC),)
- ifneq ($(PVR_ARCH),)
-  _supported_pvr_archs := rogue volcanic
-  $(eval $(call ValidateValues,PVR_ARCH,$(_supported_pvr_archs)))
-  override HWDEFS_DIR := $(TOP)/hwdefs/$(PVR_ARCH)
+ ifneq ($(PVR_ARCH_DEFS),)
+  _supported_pvr_archs_defs := rogue volcanic oceanic
+  $(eval $(call ValidateValues,PVR_ARCH_DEFS,$(_supported_pvr_archs_defs)))
+  # Validate whether PVR_ARCH is set and explain it will be ignored
+  ifneq ($(PVR_ARCH),)
+   $(warning Warning: PVR_ARCH ($(PVR_ARCH)) is specified when PVR_ARCH_DEFS ($(PVR_ARCH_DEFS)) is also specified - ignoring PVR_ARCH)
+  endif
+  ifeq ($(PVR_ARCH_DEFS),volcanic)
+   override PVR_ARCH := volcanic
+   override PVR_USC_ARCH := volcanic
+   override PVR_TPU_ARCH := volcanic
+   override PVR_FBC_ARCH := volcanic
+  else ifeq ($(PVR_ARCH_DEFS),rogue)
+   override PVR_ARCH := rogue
+   override PVR_USC_ARCH := rogue
+   override PVR_TPU_ARCH := rogue
+   override PVR_FBC_ARCH := rogue
+  else # oceanic
+   override PVR_ARCH := rogue
+   override PVR_USC_ARCH := volcanic
+   override PVR_TPU_ARCH := volcanic
+   override PVR_FBC_ARCH := volcanic
+  endif 
+  override HWDEFS_DIR := $(TOP)/hwdefs/$(PVR_ARCH_DEFS)
+ else
+  # If neither are set the build can not proceed
+  $(error DDK build requires PVR_ARCH_DEFS or RGX_BVNC to be defined)
  endif
 else
  ifneq ($(PVR_ARCH),)
-  $(warning PVR_ARCH ($(PVR_ARCH)) is specified when RGX_BVNC ($(RGX_BVNC)) is also specified - ignoring PVR_ARCH)
+  $(warning Warning: PVR_ARCH ($(PVR_ARCH)) is specified when RGX_BVNC ($(RGX_BVNC)) is also specified - ignoring PVR_ARCH)
  endif
-# Extract the BNC config name
-RGX_BNC_SPLIT := $(subst .,$(space) ,$(RGX_BVNC))
-RGX_BNC := $(word 1,$(RGX_BNC_SPLIT)).V.$(word 3,$(RGX_BNC_SPLIT)).$(word 4,$(RGX_BNC_SPLIT))
+ # Extract the BNC config name
+ RGX_BNC_SPLIT := $(subst .,$(space) ,$(RGX_BVNC))
+ RGX_BNC := $(word 1,$(RGX_BNC_SPLIT)).V.$(word 3,$(RGX_BNC_SPLIT)).$(word 4,$(RGX_BNC_SPLIT))
 
-HWDEFS_DIR_ROGUE := $(TOP)/hwdefs/rogue
-HWDEFS_DIR_VOLCANIC := $(TOP)/hwdefs/volcanic
+ HWDEFS_DIR_ROGUE := $(TOP)/hwdefs/rogue
+ HWDEFS_DIR_OCEANIC := $(TOP)/hwdefs/oceanic
+ HWDEFS_DIR_VOLCANIC := $(TOP)/hwdefs/volcanic
 
-ALL_KM_BVNCS_ROGUE := \
- $(patsubst rgxcore_km_%.h,%,\
-  $(notdir $(shell ls -v $(HWDEFS_DIR_ROGUE)/km/cores/rgxcore_km_*.h 2> /dev/null)))
-ALL_KM_BVNCS_VOLCANIC := \
- $(patsubst rgxcore_km_%.h,%,\
-  $(notdir $(shell ls -v $(HWDEFS_DIR_VOLCANIC)/km/cores/rgxcore_km_*.h 2> /dev/null)))
-ALL_KM_BVNCS := $(ALL_KM_BVNCS_ROGUE) $(ALL_KM_BVNCS_VOLCANIC)
+ ALL_KM_BVNCS_ROGUE := \
+  $(patsubst rgxcore_km_%.h,%,\
+   $(notdir $(shell ls -v $(HWDEFS_DIR_ROGUE)/km/cores/rgxcore_km_*.h 2> /dev/null)))
+ ALL_KM_BVNCS_OCEANIC := \
+  $(patsubst rgxcore_km_%.h,%,\
+   $(notdir $(shell ls -v $(HWDEFS_DIR_OCEANIC)/km/cores/rgxcore_km_*.h 2> /dev/null)))
+ ALL_KM_BVNCS_VOLCANIC := \
+  $(patsubst rgxcore_km_%.h,%,\
+   $(notdir $(shell ls -v $(HWDEFS_DIR_VOLCANIC)/km/cores/rgxcore_km_*.h 2> /dev/null)))
+ ALL_KM_BVNCS := $(ALL_KM_BVNCS_ROGUE) $(ALL_KM_BVNCS_OCEANIC) $(ALL_KM_BVNCS_VOLCANIC)
 
-ifneq ($(filter $(RGX_BVNC),$(ALL_KM_BVNCS_ROGUE)),)
- override PVR_ARCH := rogue
- override HWDEFS_DIR := $(HWDEFS_DIR_ROGUE)
-else ifneq ($(filter $(RGX_BVNC),$(ALL_KM_BVNCS_VOLCANIC)),)
- override PVR_ARCH := volcanic
- override HWDEFS_DIR := $(HWDEFS_DIR_VOLCANIC)
-else
- $(error Error: Invalid Kernel core RGX_BVNC=$(RGX_BVNC). \
-  $(if $(ALL_KM_BVNCS_ROGUE),$(newline)$(newline)Valid Rogue Kernel core BVNCs:$(newline) \
-   $(subst $(space),$(newline)$(space),$(ALL_KM_BVNCS_ROGUE))) \
-  $(if $(ALL_KM_BVNCS_VOLCANIC),$(newline)$(newline)Valid Volcanic Kernel core BVNCs:$(newline) \
-   $(subst $(space),$(newline)$(space),$(ALL_KM_BVNCS_VOLCANIC))))
-endif
+ ifneq ($(filter $(RGX_BVNC),$(ALL_KM_BVNCS_ROGUE)),)
+  override PVR_ARCH := rogue
+  override PVR_USC_ARCH := rogue
+  override PVR_TPU_ARCH := rogue
+  override PVR_FBC_ARCH := rogue
+  override HWDEFS_DIR := $(HWDEFS_DIR_ROGUE)
+  override PVR_ARCH_DEFS := rogue
+ else ifneq ($(filter $(RGX_BVNC),$(ALL_KM_BVNCS_OCEANIC)),)
+  override PVR_ARCH := rogue
+  override PVR_USC_ARCH := volcanic
+  override PVR_TPU_ARCH := volcanic
+  override PVR_FBC_ARCH := volcanic
+  override HWDEFS_DIR := $(HWDEFS_DIR_OCEANIC)
+  override PVR_ARCH_DEFS := oceanic
+ else ifneq ($(filter $(RGX_BVNC),$(ALL_KM_BVNCS_VOLCANIC)),)
+  override PVR_ARCH := volcanic
+  override PVR_USC_ARCH := volcanic
+  override PVR_TPU_ARCH := volcanic
+  override PVR_FBC_ARCH := volcanic
+  override HWDEFS_DIR := $(HWDEFS_DIR_VOLCANIC)
+  override PVR_ARCH_DEFS := volcanic
+ else
+  $(error Error: Invalid Kernel core RGX_BVNC=$(RGX_BVNC). \
+   $(if $(ALL_KM_BVNCS_ROGUE),$(newline)$(newline)Valid Rogue Kernel core BVNCs:$(newline) \
+    $(subst $(space),$(newline)$(space),$(ALL_KM_BVNCS_ROGUE)) \
+   ) \
+   $(if $(ALL_KM_BVNCS_OCEANIC),$(newline)$(newline)Valid Oceanic Kernel core BVNCs:$(newline) \
+    $(subst $(space),$(newline)$(space),$(ALL_KM_BVNCS_OCEANIC)) \
+   ) \
+   $(if $(ALL_KM_BVNCS_VOLCANIC),$(newline)$(newline)Valid Volcanic Kernel core BVNCs:$(newline) \
+    $(subst $(space),$(newline)$(space),$(ALL_KM_BVNCS_VOLCANIC)) \
+   ) \
+  )
+ endif
 
-override HWDEFS_ALL_PATHS := $(HWDEFS_DIR) $(HWDEFS_DIR)/$(RGX_BNC) $(HWDEFS_DIR)/$(RGX_BNC)/isa $(HWDEFS_DIR)/km
+ override HWDEFS_ALL_PATHS := $(HWDEFS_DIR) $(HWDEFS_DIR)/$(RGX_BNC) $(HWDEFS_DIR)/$(RGX_BNC)/isa $(HWDEFS_DIR)/km
 
-# Check if BVNC core file exist
-RGX_BVNC_CORE_KM := $(HWDEFS_DIR)/km/cores/rgxcore_km_$(RGX_BVNC).h
-RGX_BVNC_CORE_KM_HEADER := \"cores/rgxcore_km_$(RGX_BVNC).h\"
-# "rgxcore_km_$(RGX_BVNC).h"
-ifeq ($(wildcard $(RGX_BVNC_CORE_KM)),)
-$(error The file $(RGX_BVNC_CORE_KM) does not exist. \
-   Valid BVNCs: $(ALL_KM_BVNCS))
-endif
+ # Check if BVNC core file exist
+ RGX_BVNC_CORE_KM := $(HWDEFS_DIR)/km/cores/rgxcore_km_$(RGX_BVNC).h
+ RGX_BVNC_CORE_KM_HEADER := \"cores/rgxcore_km_$(RGX_BVNC).h\"
+ # "rgxcore_km_$(RGX_BVNC).h"
+ ifeq ($(wildcard $(RGX_BVNC_CORE_KM)),)
+ $(error The file $(RGX_BVNC_CORE_KM) does not exist. \
+    Valid BVNCs: $(ALL_KM_BVNCS))
+ endif
+ 
+ # Check BNC config version
+ ALL_KM_BNCS := \
+  $(patsubst rgxconfig_km_%.h,%,\
+    $(notdir $(shell ls -v $(HWDEFS_DIR)/km/configs/rgxconfig_km_*.h)))
+ ifeq ($(filter $(RGX_BNC),$(ALL_KM_BNCS)),)
+ $(error Error: Invalid Kernel config RGX_BNC=$(RGX_BNC). \
+    Valid Kernel config BNCs: $(subst $(space),$(comma)$(space),$(ALL_KM_BNCS)))
+ endif
 
-# Check BNC config version
-ALL_KM_BNCS := \
- $(patsubst rgxconfig_km_%.h,%,\
-   $(notdir $(shell ls -v $(HWDEFS_DIR)/km/configs/rgxconfig_km_*.h)))
-ifeq ($(filter $(RGX_BNC),$(ALL_KM_BNCS)),)
-$(error Error: Invalid Kernel config RGX_BNC=$(RGX_BNC). \
-   Valid Kernel config BNCs: $(subst $(space),$(comma)$(space),$(ALL_KM_BNCS)))
-endif
+ # Check if BNC config file exist
+ RGX_BNC_CONFIG_KM := $(HWDEFS_DIR)/km/configs/rgxconfig_km_$(RGX_BNC).h
+ RGX_BNC_CONFIG_KM_HEADER := \"configs/rgxconfig_km_$(RGX_BNC).h\"
+ #"rgxcore_km_$(RGX_BNC).h"
+ ifeq ($(wildcard $(RGX_BNC_CONFIG_KM)),)
+ $(error The file $(RGX_BNC_CONFIG_KM) does not exist. \
+    Valid BNCs: $(ALL_KM_BNCS))
+ endif
+endif # RGX_BVNC not set
 
-# Check if BNC config file exist
-RGX_BNC_CONFIG_KM := $(HWDEFS_DIR)/km/configs/rgxconfig_km_$(RGX_BNC).h
-RGX_BNC_CONFIG_KM_HEADER := \"configs/rgxconfig_km_$(RGX_BNC).h\"
-#"rgxcore_km_$(RGX_BNC).h"
-ifeq ($(wildcard $(RGX_BNC_CONFIG_KM)),)
-$(error The file $(RGX_BNC_CONFIG_KM) does not exist. \
-   Valid BNCs: $(ALL_KM_BNCS))
-endif
-endif
+endif # INTERNAL_CLOBBER_ONLY not true
 
-endif

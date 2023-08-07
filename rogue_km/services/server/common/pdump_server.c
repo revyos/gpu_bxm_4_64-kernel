@@ -41,7 +41,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
 #if defined(PDUMP)
-#include <stdarg.h>
+
+#if defined(__linux__)
+ #include <linux/version.h>
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+  #include <linux/stdarg.h>
+ #else
+  #include <stdarg.h>
+ #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0) */
+#else
+ #include <stdarg.h>
+#endif /* __linux__ */
 
 #include "pvrversion.h"
 #include "allocmem.h"
@@ -679,18 +689,24 @@ static INLINE void PDumpModuleTransitionState(PDUMP_SM eNewState)
 	PDumpCtrlLockRelease();
 }
 
-void PDumpPowerTransitionStart(void)
+void PDumpPowerTransitionStart(PVRSRV_DEVICE_NODE *psDeviceNode)
 {
-	PDumpCtrlLockAcquire();
-	PDumpCtrlPowerTransitionStart();
-	PDumpCtrlLockRelease();
+	if (PDumpIsDevicePermitted(psDeviceNode))
+	{
+		PDumpCtrlLockAcquire();
+		PDumpCtrlPowerTransitionStart();
+		PDumpCtrlLockRelease();
+	}
 }
 
-void PDumpPowerTransitionEnd(void)
+void PDumpPowerTransitionEnd(PVRSRV_DEVICE_NODE *psDeviceNode)
 {
-	PDumpCtrlLockAcquire();
-	PDumpCtrlPowerTransitionEnd();
-	PDumpCtrlLockRelease();
+	if (PDumpIsDevicePermitted(psDeviceNode))
+	{
+		PDumpCtrlLockAcquire();
+		PDumpCtrlPowerTransitionEnd();
+		PDumpCtrlLockRelease();
+	}
 }
 
 static PVRSRV_ERROR PDumpGetCurrentBlockKM(IMG_UINT32 *pui32BlockNum)
@@ -748,7 +764,7 @@ static IMG_BOOL _PDumpSetSplitMarker(IMG_HANDLE hStream, IMG_BOOL bRemoveOld)
 	return IMG_TRUE;
 }
 
-IMG_BOOL PDumpIsPermitted(PVRSRV_DEVICE_NODE *psDeviceNode)
+IMG_BOOL PDumpIsDevicePermitted(PVRSRV_DEVICE_NODE *psDeviceNode)
 {
 	PVRSRV_DATA *psPVRSRVData = PVRSRVGetPVRSRVData();
 
@@ -792,10 +808,10 @@ static IMG_BOOL PDumpWriteAllowed(PVRSRV_DEVICE_NODE *psDeviceNode,
 	/* No writes if for a different device than the PDump-bound device
 	 *  NB. psDeviceNode may be NULL if called during initialisation
 	 */
-	if (!PDumpIsPermitted(psDeviceNode))
+	if (!PDumpIsDevicePermitted(psDeviceNode))
 	{
 		PDUMP_HERE(5);
-		goto unlockAndReturnFalse;
+		goto returnFalse;
 	}
 
 	/* PDUMP_FLAGS_CONTINUOUS and PDUMP_FLAGS_PERSISTENT can't come together. */
@@ -903,6 +919,7 @@ unlockAndReturnTrue:
 
 unlockAndReturnFalse:
 	PDumpCtrlLockRelease();
+returnFalse:
 	if (ui32ExitHere != NULL)
 	{
 		*ui32ExitHere = here;
@@ -1803,8 +1820,10 @@ void PDumpDeInitCommon(void)
 
 void PDumpStopInitPhase(PVRSRV_DEVICE_NODE *psDeviceNode)
 {
+	IMG_UINT32 ui32PDumpBoundDevice = PVRSRVGetPVRSRVData()->ui32PDumpBoundDevice;
+
 	/* Stop the init phase for the PDump-bound device only */
-	if (psDeviceNode->sDevId.ui32InternalID == (PVRSRVGetPVRSRVData()->ui32PDumpBoundDevice))
+	if (psDeviceNode->sDevId.ui32InternalID == ui32PDumpBoundDevice)
 	{
 		/* output this comment to indicate init phase ending OSs */
 		PDUMPCOMMENT(psDeviceNode, "Stop Init Phase");
@@ -2137,7 +2156,13 @@ PVRSRV_ERROR PDumpForceCaptureStopKM(CONNECTION_DATA *psConnection,
 
 	PVR_UNREFERENCED_PARAMETER(psConnection);
 
-	PVR_UNREFERENCED_PARAMETER(psDeviceNode);
+	/* If call is not for the pdump-bound device, return immediately
+	 * taking no action.
+	 */
+	if (!PDumpIsDevicePermitted(psDeviceNode))
+	{
+		return PVRSRV_OK;
+	}
 
 	if (!PDumpCtrlCapModIsBlocked())
 	{
@@ -2250,7 +2275,13 @@ PVRSRV_ERROR PDumpSetFrameKM(CONNECTION_DATA *psConnection,
 {
 	PVRSRV_ERROR eError = PVRSRV_OK;
 
-	PVR_UNREFERENCED_PARAMETER(psDeviceNode);
+	/* If call is not for the pdump-bound device, return immediately
+	 * taking no action.
+	 */
+	if (!PDumpIsDevicePermitted(psDeviceNode))
+	{
+		return PVRSRV_OK;
+	}
 
 #if defined(PDUMP_TRACE_STATE)
 	PVR_DPF((PVR_DBG_WARNING, "PDumpSetFrameKM: ui32Frame( %d )", ui32Frame));
@@ -2304,6 +2335,10 @@ PVRSRV_ERROR PDumpSetDefaultCaptureParamsKM(CONNECTION_DATA *psConnection,
 
 	PVR_UNREFERENCED_PARAMETER(psConnection);
 
+	/* NB. We choose not to check that the device is the pdump-bound
+	 * device here, as this particular bridge call is made only from the pdump
+	 * tool itself (which may only connect to the bound device).
+	 */
 	PVR_UNREFERENCED_PARAMETER(psDeviceNode);
 
 	eError = PDumpReady();
@@ -3715,7 +3750,7 @@ ErrUnlock:
 
 /******************************************************************************
  * Function Name  : PDumpCommentKM
- * Inputs         : pszComment, ui32Flags
+ * Inputs         : ui32CommentSize, pszComment, ui32Flags
  * Outputs        : None
  * Returns        : None
  * Description    : Dumps a pre-formatted comment, primarily called from the
@@ -3723,11 +3758,14 @@ ErrUnlock:
 ******************************************************************************/
 PVRSRV_ERROR PDumpCommentKM(CONNECTION_DATA *psConnection,
                             PVRSRV_DEVICE_NODE *psDeviceNode,
-                            IMG_CHAR *pszComment, IMG_UINT32 ui32Flags)
+                            IMG_UINT32 ui32CommentSize,
+                            IMG_CHAR *pszComment,
+                            IMG_UINT32 ui32Flags)
 {
 	PVRSRV_ERROR eErr = PVRSRV_OK;
 
 	PVR_UNREFERENCED_PARAMETER(psConnection);
+	PVR_UNREFERENCED_PARAMETER(ui32CommentSize); /* Generated bridge code appends null char to pszComment. */
 
 	PDUMP_LOCK(ui32Flags);
 
@@ -3979,290 +4017,6 @@ PVRSRV_ERROR PDumpCaptureError(PVRSRV_DEVICE_NODE *psDeviceNode,
 
 	PDUMP_RELEASE_SCRIPT_STRING();
 	return PVRSRV_OK;
-}
-
-/*!
-*******************************************************************************
-
- @Function	PDumpBitmapKM
-
- @Description
-
- Dumps a bitmap from device memory to a file
-
- @Input    psDevId
- @Input    pszFileName
- @Input    ui32FileOffset
- @Input    ui32Width
- @Input    ui32Height
- @Input    ui32StrideInBytes
- @Input    sDevBaseAddr
- @Input    ui32Size
- @Input    ePixelFormat
- @Input    eMemFormat
- @Input    ui32PDumpFlags
-
- @Return   PVRSRV_ERROR			:
-
-******************************************************************************/
-PVRSRV_ERROR PDumpBitmapKM(	PVRSRV_DEVICE_NODE *psDeviceNode,
-							IMG_CHAR *pszFileName,
-							IMG_UINT32 ui32FileOffset,
-							IMG_UINT32 ui32Width,
-							IMG_UINT32 ui32Height,
-							IMG_UINT32 ui32StrideInBytes,
-							IMG_DEV_VIRTADDR sDevBaseAddr,
-							IMG_UINT32 ui32MMUContextID,
-							IMG_UINT32 ui32Size,
-							PDUMP_PIXEL_FORMAT ePixelFormat,
-							IMG_UINT32 ui32AddrMode,
-							IMG_UINT32 ui32PDumpFlags)
-{
-	PVRSRV_DEVICE_IDENTIFIER *psDevId = &psDeviceNode->sDevId;
-	PVRSRV_ERROR eErr = PVRSRV_OK;
-	PVRSRV_RGXDEV_INFO *psDevInfo = psDeviceNode->pvDevice;
-	IMG_BOOL bIsFBC31 = psDevInfo->psRGXFWIfFwSysData->ui32ConfigFlags & RGXFWIF_INICFG_FBCDC_V3_1_EN;
-	PDUMP_GET_SCRIPT_STRING();
-
-	PDUMP_LOCK(ui32PDumpFlags);
-
-	PDumpCommentWithFlagsNoLock(psDeviceNode, ui32PDumpFlags, "Dump bitmap of render.");
-
-	/* Overwrite incoming addrmode compat field if FBC v3.1 is enabled. */
-	if (bIsFBC31 &&
-		(ui32AddrMode & PVRSRV_PDUMP_ADDRMODE_FBCCOMPAT_MASK) == PVRSRV_PDUMP_ADDRMODE_FBCCOMPAT_V3_RESOURCE)
-	{
-		ui32AddrMode &= ~PVRSRV_PDUMP_ADDRMODE_FBCCOMPAT_MASK;
-		ui32AddrMode |= PVRSRV_PDUMP_ADDRMODE_FBCCOMPAT_V3_1_RESOURCE;
-	}
-
-	switch (ePixelFormat)
-	{
-		case PVRSRV_PDUMP_PIXEL_FORMAT_YUV8:
-		{
-			PDumpCommentWithFlagsNoLock(psDeviceNode, ui32PDumpFlags,
-			                            "YUV data. Switching from SII to SAB. Width=0x%08X Height=0x%08X Stride=0x%08X",
-			                            ui32Width, ui32Height, ui32StrideInBytes);
-			eErr = PDumpSNPrintf(hScript,
-									ui32MaxLen,
-									"SAB :%s:v%x:0x%010"IMG_UINT64_FMTSPECX" 0x%08X 0x%08X %s.bin\n",
-									psDevId->pszPDumpDevName,
-									ui32MMUContextID,
-									sDevBaseAddr.uiAddr,
-									ui32Size,
-									ui32FileOffset,
-									pszFileName);
-
-			PVR_GOTO_IF_ERROR(eErr, error);
-
-			PDumpWriteScript(psDeviceNode, hScript, ui32PDumpFlags);
-			break;
-		}
-		case PVRSRV_PDUMP_PIXEL_FORMAT_420PL12YUV8: // YUV420 2 planes
-		{
-			const IMG_UINT32 ui32Plane0Size = ui32StrideInBytes*ui32Height;
-			const IMG_UINT32 ui32Plane1Size = ui32Plane0Size>>1; // YUV420
-			const IMG_UINT32 ui32Plane1FileOffset = ui32FileOffset + ui32Plane0Size;
-			const IMG_UINT32 ui32Plane1MemOffset = ui32Plane0Size;
-
-			PDumpCommentWithFlagsNoLock(psDeviceNode, ui32PDumpFlags,
-			                            "YUV420 2-plane. Width=0x%08X Height=0x%08X Stride=0x%08X",
-			                            ui32Width, ui32Height, ui32StrideInBytes);
-			eErr = PDumpSNPrintf(hScript,
-						ui32MaxLen,
-						"SII %s %s.bin :%s:v%x:0x%010"IMG_UINT64_FMTSPECX" 0x%08X 0x%08X :%s:v%x:0x%010"IMG_UINT64_FMTSPECX" 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X",
-						pszFileName,
-						pszFileName,
-
-						// Plane 0 (Y)
-						psDevId->pszPDumpDevName,	// memsp
-						ui32MMUContextID,			// Context id
-						sDevBaseAddr.uiAddr,		// virtaddr
-						ui32Plane0Size,				// size
-						ui32FileOffset,				// fileoffset
-
-						// Plane 1 (UV)
-						psDevId->pszPDumpDevName,	// memsp
-						ui32MMUContextID,			// Context id
-						sDevBaseAddr.uiAddr+ui32Plane1MemOffset,	// virtaddr
-						ui32Plane1Size,				// size
-						ui32Plane1FileOffset,		// fileoffset
-
-						ePixelFormat,
-						ui32Width,
-						ui32Height,
-						ui32StrideInBytes,
-						ui32AddrMode);
-
-			PVR_GOTO_IF_ERROR(eErr, error);
-
-			PDumpWriteScript(psDeviceNode, hScript, ui32PDumpFlags);
-			break;
-		}
-
-		case PVRSRV_PDUMP_PIXEL_FORMAT_YUV_YV12: // YUV420 3 planes
-		{
-			const IMG_UINT32 ui32Plane0Size = ui32StrideInBytes*ui32Height;
-			const IMG_UINT32 ui32Plane1Size = ui32Plane0Size>>2; // YUV420
-			const IMG_UINT32 ui32Plane2Size = ui32Plane1Size;
-			const IMG_UINT32 ui32Plane1FileOffset = ui32FileOffset + ui32Plane0Size;
-			const IMG_UINT32 ui32Plane2FileOffset = ui32Plane1FileOffset + ui32Plane1Size;
-			const IMG_UINT32 ui32Plane1MemOffset = ui32Plane0Size;
-			const IMG_UINT32 ui32Plane2MemOffset = ui32Plane0Size+ui32Plane1Size;
-
-			PDumpCommentWithFlagsNoLock(psDeviceNode, ui32PDumpFlags,
-			                            "YUV420 3-plane. Width=0x%08X Height=0x%08X Stride=0x%08X",
-			                            ui32Width, ui32Height, ui32StrideInBytes);
-			eErr = PDumpSNPrintf(hScript,
-						ui32MaxLen,
-						"SII %s %s.bin :%s:v%x:0x%010"IMG_UINT64_FMTSPECX" 0x%08X 0x%08X :%s:v%x:0x%010"IMG_UINT64_FMTSPECX" 0x%08X 0x%08X :%s:v%x:0x%010"IMG_UINT64_FMTSPECX" 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X",
-						pszFileName,
-						pszFileName,
-
-						// Plane 0 (Y)
-						psDevId->pszPDumpDevName,	// memsp
-						ui32MMUContextID,			// MMU context id
-						sDevBaseAddr.uiAddr,		// virtaddr
-						ui32Plane0Size,				// size
-						ui32FileOffset,				// fileoffset
-
-						// Plane 1 (U)
-						psDevId->pszPDumpDevName,	// memsp
-						ui32MMUContextID,			// MMU context id
-						sDevBaseAddr.uiAddr+ui32Plane1MemOffset,	// virtaddr
-						ui32Plane1Size,				// size
-						ui32Plane1FileOffset,		// fileoffset
-
-						// Plane 2 (V)
-						psDevId->pszPDumpDevName,	// memsp
-						ui32MMUContextID,			// MMU context id
-						sDevBaseAddr.uiAddr+ui32Plane2MemOffset,	// virtaddr
-						ui32Plane2Size,				// size
-						ui32Plane2FileOffset,		// fileoffset
-
-						ePixelFormat,
-						ui32Width,
-						ui32Height,
-						ui32StrideInBytes,
-						ui32AddrMode);
-
-			PVR_GOTO_IF_ERROR(eErr, error);
-
-			PDumpWriteScript(psDeviceNode, hScript, ui32PDumpFlags);
-			break;
-		}
-
-		case PVRSRV_PDUMP_PIXEL_FORMAT_YUV_YV32: // YV32 - 4 contiguous planes in the order VUYA, stride can be > width.
-		{
-			const IMG_UINT32 ui32PlaneSize = ui32StrideInBytes*ui32Height; // All 4 planes are the same size
-			const IMG_UINT32 ui32Plane0FileOffset = ui32FileOffset + (ui32PlaneSize<<1);		// SII plane 0 is Y, which is YV32 plane 2
-			const IMG_UINT32 ui32Plane1FileOffset = ui32FileOffset + ui32PlaneSize;				// SII plane 1 is U, which is YV32 plane 1
-			const IMG_UINT32 ui32Plane2FileOffset = ui32FileOffset;								// SII plane 2 is V, which is YV32 plane 0
-			const IMG_UINT32 ui32Plane3FileOffset = ui32Plane0FileOffset + ui32PlaneSize;		// SII plane 3 is A, which is YV32 plane 3
-			const IMG_UINT32 ui32Plane0MemOffset = ui32PlaneSize<<1;
-			const IMG_UINT32 ui32Plane1MemOffset = ui32PlaneSize;
-			const IMG_UINT32 ui32Plane2MemOffset = 0;
-			const IMG_UINT32 ui32Plane3MemOffset = ui32Plane0MemOffset + ui32PlaneSize;
-
-			PDumpCommentWithFlagsNoLock(psDeviceNode, ui32PDumpFlags,
-			                            "YV32 4 planes. Width=0x%08X Height=0x%08X Stride=0x%08X",
-			                            ui32Width, ui32Height, ui32StrideInBytes);
-
-			PDumpCommentWithFlagsNoLock(psDeviceNode, ui32PDumpFlags,
-			                            "YV32 plane size is 0x%08X", ui32PlaneSize);
-
-			PDumpCommentWithFlagsNoLock(psDeviceNode, ui32PDumpFlags,
-			                            "YV32 Plane 0 Mem Offset=0x%08X", ui32Plane0MemOffset);
-			PDumpCommentWithFlagsNoLock(psDeviceNode, ui32PDumpFlags,
-			                            "YV32 Plane 1 Mem Offset=0x%08X", ui32Plane1MemOffset);
-			PDumpCommentWithFlagsNoLock(psDeviceNode, ui32PDumpFlags,
-			                            "YV32 Plane 2 Mem Offset=0x%08X", ui32Plane2MemOffset);
-			PDumpCommentWithFlagsNoLock(psDeviceNode, ui32PDumpFlags,
-			                            "YV32 Plane 3 Mem Offset=0x%08X", ui32Plane3MemOffset);
-
-			/*
-				SII <imageset> <filename>	:<memsp1>:v<id1>:<virtaddr1> <size1> <fileoffset1>		Y
-											:<memsp2>:v<id2>:<virtaddr2> <size2> <fileoffset2>		U
-											:<memsp3>:v<id3>:<virtaddr3> <size3> <fileoffset3>		V
-											:<memsp4>:v<id4>:<virtaddr4> <size4> <fileoffset4>		A
-											<pixfmt> <width> <height> <stride> <addrmode>
-			*/
-			eErr = PDumpSNPrintf(hScript,
-						ui32MaxLen,
-						"SII %s %s.bin :%s:v%x:0x%010"IMG_UINT64_FMTSPECX" 0x%08X 0x%08X :%s:v%x:0x%010"IMG_UINT64_FMTSPECX" 0x%08X 0x%08X :%s:v%x:0x%010"IMG_UINT64_FMTSPECX" 0x%08X 0x%08X :%s:v%x:0x%010"IMG_UINT64_FMTSPECX" 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X",
-						pszFileName,
-						pszFileName,
-
-						// Plane 0 (V)
-						psDevId->pszPDumpDevName,	// memsp
-						ui32MMUContextID,			// MMU context id
-						sDevBaseAddr.uiAddr+ui32Plane0MemOffset,	// virtaddr
-						ui32PlaneSize,				// size
-						ui32Plane0FileOffset,		// fileoffset
-
-						// Plane 1 (U)
-						psDevId->pszPDumpDevName,	// memsp
-						ui32MMUContextID,			// MMU context id
-						sDevBaseAddr.uiAddr+ui32Plane1MemOffset,	// virtaddr
-						ui32PlaneSize,				// size
-						ui32Plane1FileOffset,		// fileoffset
-
-						// Plane 2 (Y)
-						psDevId->pszPDumpDevName,	// memsp
-						ui32MMUContextID,			// MMU context id
-						sDevBaseAddr.uiAddr+ui32Plane2MemOffset,	// virtaddr
-						ui32PlaneSize,				// size
-						ui32Plane2FileOffset,		// fileoffset
-
-						// Plane 3 (A)
-						psDevId->pszPDumpDevName,	// memsp
-						ui32MMUContextID,			// MMU context id
-						sDevBaseAddr.uiAddr+ui32Plane3MemOffset,	// virtaddr
-						ui32PlaneSize,				// size
-						ui32Plane3FileOffset,		// fileoffset
-
-						ePixelFormat,
-						ui32Width,
-						ui32Height,
-						ui32StrideInBytes,
-						ui32AddrMode);
-
-			PVR_GOTO_IF_ERROR(eErr, error);
-
-			PDumpWriteScript(psDeviceNode, hScript, ui32PDumpFlags);
-			break;
-		}
-
-		default: // Single plane formats
-		{
-			eErr = PDumpSNPrintf(hScript,
-						ui32MaxLen,
-						"SII %s %s.bin :%s:v%x:0x%010"IMG_UINT64_FMTSPECX" 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X",
-						pszFileName,
-						pszFileName,
-						psDevId->pszPDumpDevName,
-						ui32MMUContextID,
-						sDevBaseAddr.uiAddr,
-						ui32Size,
-						ui32FileOffset,
-						ePixelFormat,
-						ui32Width,
-						ui32Height,
-						ui32StrideInBytes,
-						ui32AddrMode);
-
-			PVR_GOTO_IF_ERROR(eErr, error);
-
-			PDumpWriteScript(psDeviceNode, hScript, ui32PDumpFlags);
-			break;
-		}
-	}
-
-error:
-	PDUMP_UNLOCK(ui32PDumpFlags);
-
-	PDUMP_RELEASE_SCRIPT_STRING()
-	return eErr;
 }
 
 /*!

@@ -132,4 +132,5 @@ endif
 $(eval $(call TunableKernelConfigC,SUPPORT_APOLLO_FPGA,))
 
 $(eval $(call TunableKernelConfigC,SUPPORT_FAKE_SECURE_ION_HEAP,))
+$(eval $(call TunableKernelConfigC,SUPPORT_FAKE_SECURE_DMA_HEAP,))
 $(eval $(call TunableKernelConfigC,TC_SECURE_MEM_SIZE,128))

@@ -53,7 +53,11 @@
 #if defined(PDP_USE_ATOMIC)
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
+#include <drm/drm_gem_atomic_helper.h>
+#else
 #include <drm/drm_gem_framebuffer_helper.h>
+#endif
 #endif
 
 #include <powervr/img_drm_fourcc.h>
@@ -68,9 +72,18 @@
 
 
 #if defined(PDP_USE_ATOMIC)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
+static int pdp_plane_helper_atomic_check(struct drm_plane *plane,
+					 struct drm_atomic_state *atomic_state)
+#else
 static int pdp_plane_helper_atomic_check(struct drm_plane *plane,
 					 struct drm_plane_state *state)
+#endif
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
+	struct drm_plane_state *state = drm_atomic_get_new_plane_state(atomic_state,
+								       plane);
+#endif
 	struct drm_crtc_state *crtc_new_state;
 
 	if (!state->crtc)
@@ -85,8 +98,13 @@ static int pdp_plane_helper_atomic_check(struct drm_plane *plane,
 						   false, true);
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
+static void pdp_plane_helper_atomic_update(struct drm_plane *plane,
+					   struct drm_atomic_state *atomic_state)
+#else
 static void pdp_plane_helper_atomic_update(struct drm_plane *plane,
 					   struct drm_plane_state *old_state)
+#endif
 {
 	struct drm_plane_state *plane_state = plane->state;
 	struct drm_framebuffer *fb = plane_state->fb;
@@ -98,7 +116,7 @@ static void pdp_plane_helper_atomic_update(struct drm_plane *plane,
 }
 
 static const struct drm_plane_helper_funcs pdp_plane_helper_funcs = {
-	.prepare_fb =  drm_gem_fb_prepare_fb,
+	.prepare_fb = drm_gem_plane_helper_prepare_fb,
 	.atomic_check = pdp_plane_helper_atomic_check,
 	.atomic_update = pdp_plane_helper_atomic_update,
 };

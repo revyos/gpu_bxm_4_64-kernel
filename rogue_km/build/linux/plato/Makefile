@@ -137,7 +137,7 @@ include ../common/3rdparty.mk
 
 ifeq ($(PLATO_MEMORY_CONFIG),PLATO_MEMORY_LOCAL)
  $(eval $(call BothConfigC,LMA,))
- $(eval $(call KernelConfigMake,LMA,))
+ $(eval $(call KernelConfigMake,LMA,1))
 endif
 
 ifeq ($(SUPPORT_GIGACLUSTER), 1)

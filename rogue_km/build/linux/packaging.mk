@@ -95,7 +95,7 @@ $(LLVM_OUT_DIR):
 # happens fairly often). All referenced patches get copied to the location
 # of the generated spec file.
 #
-MESA_PATCH_DIR := $(LWS_GIT_PATCH_DIR)/mesa/mesa-21.0.1
+MESA_PATCH_DIR := $(LWS_GIT_PATCH_DIR)/mesa/mesa-21.2.1
 MESA_PATCHES := $(sort $(notdir $(wildcard $(MESA_PATCH_DIR)/*)))
 MESA_OUT_DIR := $(RELATIVE_OUT)/packaging/mesa-img
 

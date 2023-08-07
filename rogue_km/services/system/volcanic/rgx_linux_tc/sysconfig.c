@@ -498,6 +498,10 @@ InitHostHeaps(const SYS_DATA *psSysData, PHYS_HEAP_CONFIG *pasPhysHeaps)
 	pasPhysHeaps[PHY_HEAP_SYSTEM].psMemFuncs = &gsHostPhysHeapFuncs;
 	pasPhysHeaps[PHY_HEAP_SYSTEM].ui32UsageFlags = PHYS_HEAP_USAGE_CPU_LOCAL;
 
+	PVR_DPF((PVR_DBG_WARNING,
+	         "Initialising CPU_LOCAL UMA Host PhysHeaps with memory mode: %d",
+	         psSysData->pdata->mem_mode));
+
 	return PVRSRV_OK;
 }
 
@@ -747,8 +751,6 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 
 	psSysData->pdev = to_platform_device((struct device *)pvOSDevice);
 	psSysData->pdata = psSysData->pdev->dev.platform_data;
-
-	PVR_ASSERT(TC_MEMORY_CONFIG == psSysData->pdata->mem_mode);
 
 	/*
 	 * The device cannot address system memory, so there is no DMA

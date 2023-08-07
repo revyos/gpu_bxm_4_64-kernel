@@ -257,8 +257,20 @@ function install_via_ssh() {
     PACKAGEDIR_REMOTE=/tmp/Rogue_DDK_Install_Root
     copy_files_locally
 
+    if [ -n "$INSTALL_TARGET_COMPRESS" ]; then
+        # The comma converts the first character to lower case
+        if [  "${INSTALL_TARGET_COMPRESS,}" = "y" ]; then
+            RSYNC_ZIP="--compress"
+        # The hash removes the shortest matching prefix, effectively checking the value is a digit
+        elif [ -z "${INSTALL_TARGET_COMPRESS#[0-9]}" ]; then
+            RSYNC_ZIP="--compress --compress-level=${INSTALL_TARGET_COMPRESS}"
+        else
+            bail "Invalid value for INSTALL_TARGET_COMPRESS"
+        fi
+    fi
+
     echo "RSyncing $PACKAGEDIR to $INSTALL_TARGET:$INSTALL_TARGET_PORT."
-    $DOIT rsync -crlpt -e "ssh -p \"$INSTALL_TARGET_PORT\"" --delete "$PACKAGEDIR"/ root@"$INSTALL_TARGET":"$PACKAGEDIR_REMOTE" || bail "Couldn't rsync $PACKAGEDIR to root@$INSTALL_TARGET"
+    $DOIT rsync -crlpt $RSYNC_ZIP -e "ssh -p \"$INSTALL_TARGET_PORT\"" --delete "$PACKAGEDIR"/ root@"$INSTALL_TARGET":"$PACKAGEDIR_REMOTE" || bail "Couldn't rsync $PACKAGEDIR to root@$INSTALL_TARGET"
     echo "Running ${INSTALL_PREFIX}nstall remotely."
 
     REMOTE_COMMAND="bash $PACKAGEDIR_REMOTE/install.sh -r $INSTALL_TARGET_PATH"

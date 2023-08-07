@@ -189,7 +189,7 @@ PVRSRVBridgePVRSRVPDumpForceCaptureStop(IMG_UINT32 ui32DispatchTableEntry,
 static POS_LOCK pPDUMPCTRLBridgeLock;
 
 PVRSRV_ERROR InitPDUMPCTRLBridge(void);
-PVRSRV_ERROR DeinitPDUMPCTRLBridge(void);
+void DeinitPDUMPCTRLBridge(void);
 
 /*
  * Register all PDUMPCTRL functions with services
@@ -222,9 +222,9 @@ PVRSRV_ERROR InitPDUMPCTRLBridge(void)
 /*
  * Unregister all pdumpctrl functions with services
  */
-PVRSRV_ERROR DeinitPDUMPCTRLBridge(void)
+void DeinitPDUMPCTRLBridge(void)
 {
-	PVR_LOG_RETURN_IF_ERROR(OSLockDestroy(pPDUMPCTRLBridgeLock), "OSLockDestroy");
+	OSLockDestroy(pPDUMPCTRLBridgeLock);
 
 	UnsetDispatchTableEntry(PVRSRV_BRIDGE_PDUMPCTRL,
 				PVRSRV_BRIDGE_PDUMPCTRL_PVRSRVPDUMPGETSTATE);
@@ -241,5 +241,4 @@ PVRSRV_ERROR DeinitPDUMPCTRLBridge(void)
 	UnsetDispatchTableEntry(PVRSRV_BRIDGE_PDUMPCTRL,
 				PVRSRV_BRIDGE_PDUMPCTRL_PVRSRVPDUMPFORCECAPTURESTOP);
 
-	return PVRSRV_OK;
 }

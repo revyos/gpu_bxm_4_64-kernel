@@ -397,22 +397,19 @@ e1:
 	return eError;
 }
 
-/* Release a handle in case a resource has not been registered with
+/* Destroy a handle in case a resource has not been registered with
  * the resource manager */
-static PVRSRV_ERROR _SyncFbReleaseHandle(IMG_HANDLE hHandle,
+static PVRSRV_ERROR _SyncFbDestroyHandle(IMG_HANDLE hHandle,
                                          PVRSRV_HANDLE_TYPE eType)
 {
 	PVRSRV_ERROR eError;
 	PVRSRV_HANDLE_BASE *psHandleBase;
 
 	eError = _SyncFbGetProcHandleBase(&psHandleBase);
-
 	PVR_GOTO_IF_ERROR(eError, e1);
 
-	eError = PVRSRVReleaseHandle(psHandleBase,
-	                             hHandle,
-	                             eType);
-	PVR_GOTO_IF_ERROR(eError, e1);
+	eError = PVRSRVDestroyHandle(psHandleBase, hHandle, eType);
+	PVR_LOG_GOTO_IF_ERROR(eError, "PVRSRVDestroyHandle", e1);
 
 	return PVRSRV_OK;
 
@@ -807,10 +804,9 @@ static PVRSRV_ERROR SyncFbFenceGetCheckpoints(PVRSRV_FENCE hFence, IMG_UINT32 *p
 	*papsCheckpoints = apsCheckpoints;
 
 e1:
-	eError = PVRSRVReleaseHandle(psHBase,
-	                             (IMG_HANDLE) (uintptr_t) hFence,
-	                             PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
-	PVR_LOG_IF_ERROR(eError, "PVRSRVReleaseHandle");
+	PVRSRVReleaseHandle(psHBase,
+	                    (IMG_HANDLE) (uintptr_t) hFence,
+	                    PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
 e0:
 	return eError;
 }
@@ -1748,7 +1744,8 @@ PVRSRV_ERROR SyncFbTimelineCreatePVR(IMG_UINT32 uiTimelineNameSize,
 	                             ppsTimeline);
 }
 
-PVRSRV_ERROR SyncFbFenceCreatePVR(const IMG_CHAR *pszName,
+PVRSRV_ERROR SyncFbFenceCreatePVR(PPVRSRV_DEVICE_NODE psDeviceNode,
+                                  const IMG_CHAR *pszName,
                                   PVRSRV_TIMELINE iTl,
                                   PSYNC_CHECKPOINT_CONTEXT psSyncCheckpointContext,
                                   PVRSRV_FENCE *piOutFence,
@@ -1815,7 +1812,7 @@ PVRSRV_ERROR SyncFbFenceCreatePVR(const IMG_CHAR *pszName,
 	psNewFence->apsFenceSyncList = OSAllocMem(sizeof(*(psNewFence->apsFenceSyncList)));
 	PVR_LOG_GOTO_IF_NOMEM(psNewFence->apsFenceSyncList, eError, e4);
 
-	psNewFence->psDevNode = SyncCheckpointGetAssociatedDevice(psSyncCheckpointContext);
+	psNewFence->psDevNode = psDeviceNode;
 
 	/* Lock down TL until new point is fully created and inserted */
 	OSLockAcquire(psTl->hTlLock);
@@ -1890,20 +1887,15 @@ PVRSRV_ERROR SyncFbFenceCreatePVR(const IMG_CHAR *pszName,
 	                      psTl->pszName,
 	                      psTl->iUID);
 
-	eError = PVRSRVReleaseHandle(psHandleBase,
-	                             (IMG_HANDLE) (uintptr_t) iTl,
-	                             PVRSRV_HANDLE_TYPE_PVRSRV_TIMELINE_SERVER);
-	PVR_LOG_GOTO_IF_ERROR(eError, "PVRSRVReleaseHandle", e8);
+	PVRSRVReleaseHandle(psHandleBase,
+	                    (IMG_HANDLE) (uintptr_t) iTl,
+	                    PVRSRV_HANDLE_TYPE_PVRSRV_TIMELINE_SERVER);
 
 	*puiFenceUID = psNewFence->iUID;
 	*piOutFence = (PVRSRV_FENCE) (uintptr_t) hOutFence;
 
 	PVR_DPF_RETURN_RC1(PVRSRV_OK, psNewFence);
 
-e8:
-	PVRSRVReleaseHandle(psHandleBase,
-	                    hOutFence,
-	                    PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
 e7:
 	SyncCheckpointFree(*ppsOutCheckpoint);
 e6:
@@ -2050,10 +2042,9 @@ PVRSRV_ERROR SyncFbFenceResolvePVR(PSYNC_CHECKPOINT_CONTEXT psContext,
 	*puiNumCheckpoints = uiNumCheckpoints;
 	*papsCheckpoints = apsCheckpoints;
 
-	eError = PVRSRVReleaseHandle(psHBase,
-	                             (IMG_HANDLE) (uintptr_t) iFence,
-	                             PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
-	PVR_LOG_GOTO_IF_ERROR(eError, "PVRSRVReleaseHandle", e2);
+	PVRSRVReleaseHandle(psHBase,
+	                    (IMG_HANDLE) (uintptr_t) iFence,
+	                    PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
 
 	PVR_DPF_RETURN_OK;
 
@@ -2089,7 +2080,7 @@ static PVRSRV_ERROR SyncFbFenceRollbackPVR(PVRSRV_FENCE iFence, void *pvFenceDat
 
 	PVR_GOTO_IF_INVALID_PARAM(iFence != PVRSRV_NO_FENCE, eError, e1);
 
-	eError = _SyncFbReleaseHandle((IMG_HANDLE) (uintptr_t) iFence,
+	eError = _SyncFbDestroyHandle((IMG_HANDLE) (uintptr_t) iFence,
 	                              PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
 	PVR_GOTO_IF_ERROR(eError, e1);
 
@@ -2555,14 +2546,13 @@ PVRSRV_ERROR SyncFbSWTimelineFenceCreateKM(PVRSRV_DEVICE_NODE *psDeviceNode,
 	PVR_GOTO_IF_ERROR(eError, e2);
 
 	/* Drop the reference we took on the timeline earlier */
-	eError = PVRSRVReleaseHandle(psHandleBase,
-	                             (IMG_HANDLE) (uintptr_t) iSWTimeline,
-	                             PVRSRV_HANDLE_TYPE_PVRSRV_TIMELINE_SERVER);
-	if (eError == PVRSRV_OK)
-	{
-		*piOutputFence = (PVRSRV_FENCE) (uintptr_t) hOutFence;
-		goto e0;
-	}
+	PVRSRVReleaseHandle(psHandleBase,
+	                    (IMG_HANDLE) (uintptr_t) iSWTimeline,
+	                    PVRSRV_HANDLE_TYPE_PVRSRV_TIMELINE_SERVER);
+
+	*piOutputFence = (PVRSRV_FENCE) (uintptr_t) hOutFence;
+
+	return PVRSRV_OK;
 
 e2:
 	/* Release the fence we created, as we failed to
@@ -3032,7 +3022,8 @@ PVRSRV_ERROR TestIOCTLSyncFbFenceCreatePVR(CONNECTION_DATA *psConnection,
 	_GetCheckContext(psDevNode,
 	                 &psContext);
 
-	eError = SyncFbFenceCreatePVR(pszName,
+	eError = SyncFbFenceCreatePVR(psDevNode,
+	                              pszName,
 	                              iTL,
 	                              psContext,
 	                              &iFence,

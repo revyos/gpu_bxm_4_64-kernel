@@ -253,10 +253,11 @@ PVRSRVBridgeSyncFbTimelineRelease(IMG_UINT32 ui32DispatchTableEntry,
 	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbTimelineReleaseOUT->eError =
-	    PVRSRVReleaseHandleStagedUnlock(psConnection->psProcessHandleBase->psHandleBase,
-					    (IMG_HANDLE) psSyncFbTimelineReleaseIN->hTimeline,
-					    PVRSRV_HANDLE_TYPE_PVRSRV_TIMELINE_SERVER);
+	    PVRSRVDestroyHandleStagedUnlocked(psConnection->psProcessHandleBase->psHandleBase,
+					      (IMG_HANDLE) psSyncFbTimelineReleaseIN->hTimeline,
+					      PVRSRV_HANDLE_TYPE_PVRSRV_TIMELINE_SERVER);
 	if (unlikely((psSyncFbTimelineReleaseOUT->eError != PVRSRV_OK) &&
+		     (psSyncFbTimelineReleaseOUT->eError != PVRSRV_ERROR_KERNEL_CCB_FULL) &&
 		     (psSyncFbTimelineReleaseOUT->eError != PVRSRV_ERROR_RETRY)))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
@@ -581,10 +582,11 @@ PVRSRVBridgeSyncFbFenceRelease(IMG_UINT32 ui32DispatchTableEntry,
 	LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 	psSyncFbFenceReleaseOUT->eError =
-	    PVRSRVReleaseHandleStagedUnlock(psConnection->psProcessHandleBase->psHandleBase,
-					    (IMG_HANDLE) psSyncFbFenceReleaseIN->hFence,
-					    PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
+	    PVRSRVDestroyHandleStagedUnlocked(psConnection->psProcessHandleBase->psHandleBase,
+					      (IMG_HANDLE) psSyncFbFenceReleaseIN->hFence,
+					      PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_SERVER);
 	if (unlikely((psSyncFbFenceReleaseOUT->eError != PVRSRV_OK) &&
+		     (psSyncFbFenceReleaseOUT->eError != PVRSRV_ERROR_KERNEL_CCB_FULL) &&
 		     (psSyncFbFenceReleaseOUT->eError != PVRSRV_ERROR_RETRY)))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
@@ -1389,7 +1391,7 @@ SyncFbFenceExportInsecure_exit:
 			/* Lock over handle creation cleanup. */
 			LockHandle(KERNEL_HANDLE_BASE);
 
-			eError = PVRSRVReleaseHandleUnlocked(KERNEL_HANDLE_BASE,
+			eError = PVRSRVDestroyHandleUnlocked(KERNEL_HANDLE_BASE,
 							     (IMG_HANDLE)
 							     psSyncFbFenceExportInsecureOUT->
 							     hExport,
@@ -1415,7 +1417,7 @@ SyncFbFenceExportInsecure_exit:
 			LockHandle(psConnection->psProcessHandleBase->psHandleBase);
 
 			eError =
-			    PVRSRVReleaseHandleUnlocked(psConnection->psProcessHandleBase->
+			    PVRSRVDestroyHandleUnlocked(psConnection->psProcessHandleBase->
 							psHandleBase, hExportInt,
 							PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT);
 			if ((eError != PVRSRV_OK) && (eError != PVRSRV_ERROR_RETRY))
@@ -1507,10 +1509,11 @@ PVRSRVBridgeSyncFbFenceExportDestroyInsecure(IMG_UINT32 ui32DispatchTableEntry,
 	PVR_ASSERT(psSyncFbFenceExportDestroyInsecureOUT->eError == PVRSRV_OK);
 
 	psSyncFbFenceExportDestroyInsecureOUT->eError =
-	    PVRSRVReleaseHandleStagedUnlock(psConnection->psProcessHandleBase->psHandleBase,
-					    hExportInt, PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT);
+	    PVRSRVDestroyHandleStagedUnlocked(psConnection->psProcessHandleBase->psHandleBase,
+					      hExportInt, PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT);
 	if (unlikely((psSyncFbFenceExportDestroyInsecureOUT->eError != PVRSRV_OK) &&
-		     (psSyncFbFenceExportDestroyInsecureOUT->eError != PVRSRV_ERROR_RETRY)))
+		     (psSyncFbFenceExportDestroyInsecureOUT->eError != PVRSRV_ERROR_KERNEL_CCB_FULL)
+		     && (psSyncFbFenceExportDestroyInsecureOUT->eError != PVRSRV_ERROR_RETRY)))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 			 "%s: %s",
@@ -1526,11 +1529,12 @@ PVRSRVBridgeSyncFbFenceExportDestroyInsecure(IMG_UINT32 ui32DispatchTableEntry,
 	LockHandle(KERNEL_HANDLE_BASE);
 
 	psSyncFbFenceExportDestroyInsecureOUT->eError =
-	    PVRSRVReleaseHandleStagedUnlock(KERNEL_HANDLE_BASE,
-					    (IMG_HANDLE) psSyncFbFenceExportDestroyInsecureIN->
-					    hExport, PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT);
+	    PVRSRVDestroyHandleStagedUnlocked(KERNEL_HANDLE_BASE,
+					      (IMG_HANDLE) psSyncFbFenceExportDestroyInsecureIN->
+					      hExport, PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT);
 	if (unlikely
 	    ((psSyncFbFenceExportDestroyInsecureOUT->eError != PVRSRV_OK)
+	     && (psSyncFbFenceExportDestroyInsecureOUT->eError != PVRSRV_ERROR_KERNEL_CCB_FULL)
 	     && (psSyncFbFenceExportDestroyInsecureOUT->eError != PVRSRV_ERROR_RETRY)))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
@@ -1739,11 +1743,12 @@ PVRSRVBridgeSyncFbFenceExportDestroySecure(IMG_UINT32 ui32DispatchTableEntry,
 	LockHandle(psConnection->psHandleBase);
 
 	psSyncFbFenceExportDestroySecureOUT->eError =
-	    PVRSRVReleaseHandleStagedUnlock(psConnection->psHandleBase,
-					    (IMG_HANDLE) psSyncFbFenceExportDestroySecureIN->
-					    hExport, PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT);
+	    PVRSRVDestroyHandleStagedUnlocked(psConnection->psHandleBase,
+					      (IMG_HANDLE) psSyncFbFenceExportDestroySecureIN->
+					      hExport, PVRSRV_HANDLE_TYPE_PVRSRV_FENCE_EXPORT);
 	if (unlikely
 	    ((psSyncFbFenceExportDestroySecureOUT->eError != PVRSRV_OK)
+	     && (psSyncFbFenceExportDestroySecureOUT->eError != PVRSRV_ERROR_KERNEL_CCB_FULL)
 	     && (psSyncFbFenceExportDestroySecureOUT->eError != PVRSRV_ERROR_RETRY)))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
@@ -1831,7 +1836,7 @@ SyncFbFenceImportSecure_exit:
  */
 
 PVRSRV_ERROR InitSYNCFALLBACKBridge(void);
-PVRSRV_ERROR DeinitSYNCFALLBACKBridge(void);
+void DeinitSYNCFALLBACKBridge(void);
 
 /*
  * Register all SYNCFALLBACK functions with services
@@ -1908,7 +1913,7 @@ PVRSRV_ERROR InitSYNCFALLBACKBridge(void)
 /*
  * Unregister all syncfallback functions with services
  */
-PVRSRV_ERROR DeinitSYNCFALLBACKBridge(void)
+void DeinitSYNCFALLBACKBridge(void)
 {
 
 	UnsetDispatchTableEntry(PVRSRV_BRIDGE_SYNCFALLBACK,
@@ -1959,5 +1964,4 @@ PVRSRV_ERROR DeinitSYNCFALLBACKBridge(void)
 	UnsetDispatchTableEntry(PVRSRV_BRIDGE_SYNCFALLBACK,
 				PVRSRV_BRIDGE_SYNCFALLBACK_SYNCFBFENCEIMPORTSECURE);
 
-	return PVRSRV_OK;
 }

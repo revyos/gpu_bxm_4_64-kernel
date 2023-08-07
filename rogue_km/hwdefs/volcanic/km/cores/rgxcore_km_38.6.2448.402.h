@@ -1,5 +1,5 @@
 /*************************************************************************/ /*!
-@Title          RGX Core BVNC 30.4.1632.1
+@Title          RGX Core BVNC 38.6.2448.402
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 @License        Dual MIT/GPLv2
 
@@ -39,24 +39,26 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef RGXCORE_KM_30_4_1632_1_H
-#define RGXCORE_KM_30_4_1632_1_H
+#ifndef RGXCORE_KM_38_6_2448_402_H
+#define RGXCORE_KM_38_6_2448_402_H
 
-/* Automatically generated file (14/12/2020 09:01:31): Do not edit manually */
-/* CS: @5541679 */
+/* Automatically generated file (22/10/2021 09:01:25): Do not edit manually */
+/* CS: @6068975 */
 
 /******************************************************************************
- * BVNC = 30.4.1632.1
+ * BVNC = 38.6.2448.402
  *****************************************************************************/
-#define RGX_BVNC_KM_B 30
-#define RGX_BVNC_KM_V 4
-#define RGX_BVNC_KM_N 1632
-#define RGX_BVNC_KM_C 1
+#define RGX_BVNC_KM_B 38
+#define RGX_BVNC_KM_V 6
+#define RGX_BVNC_KM_N 2448
+#define RGX_BVNC_KM_C 402
 
 /******************************************************************************
  * Errata
  *****************************************************************************/
 
+#define FIX_HW_BRN_71960
+#define FIX_HW_BRN_72143
 
 
 
@@ -66,4 +68,4 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 
-#endif /* RGXCORE_KM_30_4_1632_1_H */
+#endif /* RGXCORE_KM_38_6_2448_402_H */

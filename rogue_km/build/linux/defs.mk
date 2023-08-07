@@ -302,5 +302,5 @@ endef
 
 define aidl_headers
 $(addprefix $(1)/$($(1)_type)/$($(1)_intf_path)/, \
-	$(foreach _i,$($(1)_intf_class),Bn$(_i).h Bp$(_i).h $(_i).h))
+	$(foreach _i,$($(1)_intf_class),$(_i).h))
 endef

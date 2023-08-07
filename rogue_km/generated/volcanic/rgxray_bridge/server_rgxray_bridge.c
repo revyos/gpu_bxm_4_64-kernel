@@ -195,7 +195,10 @@ PVRSRVBridgeRGXCreateRayContext(IMG_UINT32 ui32DispatchTableEntry,
 					hPrivDataInt,
 					psRGXCreateRayContextIN->ui32ContextFlags,
 					psRGXCreateRayContextIN->ui32StaticRayContextStateSize,
-					ui8sStaticRayContextStateInt, &psRayContextInt);
+					ui8sStaticRayContextStateInt,
+					psRGXCreateRayContextIN->ui64RobustnessAddress,
+					psRGXCreateRayContextIN->ui32MaxDeadlineMS,
+					&psRayContextInt);
 	/* Exit early if bridged call fails */
 	if (unlikely(psRGXCreateRayContextOUT->eError != PVRSRV_OK))
 	{
@@ -277,10 +280,11 @@ PVRSRVBridgeRGXDestroyRayContext(IMG_UINT32 ui32DispatchTableEntry,
 	LockHandle(psConnection->psHandleBase);
 
 	psRGXDestroyRayContextOUT->eError =
-	    PVRSRVReleaseHandleStagedUnlock(psConnection->psHandleBase,
-					    (IMG_HANDLE) psRGXDestroyRayContextIN->hRayContext,
-					    PVRSRV_HANDLE_TYPE_RGX_SERVER_RAY_CONTEXT);
+	    PVRSRVDestroyHandleStagedUnlocked(psConnection->psHandleBase,
+					      (IMG_HANDLE) psRGXDestroyRayContextIN->hRayContext,
+					      PVRSRV_HANDLE_TYPE_RGX_SERVER_RAY_CONTEXT);
 	if (unlikely((psRGXDestroyRayContextOUT->eError != PVRSRV_OK) &&
+		     (psRGXDestroyRayContextOUT->eError != PVRSRV_ERROR_KERNEL_CCB_FULL) &&
 		     (psRGXDestroyRayContextOUT->eError != PVRSRV_ERROR_RETRY)))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
@@ -537,7 +541,6 @@ PVRSRVBridgeRGXKickRDM(IMG_UINT32 ui32DispatchTableEntry,
 
 	psRGXKickRDMOUT->eError =
 	    PVRSRVRGXKickRDMKM(psRayContextInt,
-			       psRGXKickRDMIN->ui32ClientCacheOpSeqNum,
 			       psRGXKickRDMIN->ui32ClientUpdateCount,
 			       psClientUpdateUFOSyncPrimBlockInt,
 			       ui32ClientUpdateOffsetInt,
@@ -602,7 +605,7 @@ RGXKickRDM_exit:
  */
 
 PVRSRV_ERROR InitRGXRAYBridge(void);
-PVRSRV_ERROR DeinitRGXRAYBridge(void);
+void DeinitRGXRAYBridge(void);
 
 /*
  * Register all RGXRAY functions with services
@@ -625,7 +628,7 @@ PVRSRV_ERROR InitRGXRAYBridge(void)
 /*
  * Unregister all rgxray functions with services
  */
-PVRSRV_ERROR DeinitRGXRAYBridge(void)
+void DeinitRGXRAYBridge(void)
 {
 
 	UnsetDispatchTableEntry(PVRSRV_BRIDGE_RGXRAY, PVRSRV_BRIDGE_RGXRAY_RGXCREATERAYCONTEXT);
@@ -634,5 +637,4 @@ PVRSRV_ERROR DeinitRGXRAYBridge(void)
 
 	UnsetDispatchTableEntry(PVRSRV_BRIDGE_RGXRAY, PVRSRV_BRIDGE_RGXRAY_RGXKICKRDM);
 
-	return PVRSRV_OK;
 }

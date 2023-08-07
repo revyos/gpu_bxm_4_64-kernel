@@ -356,16 +356,15 @@ typedef struct PVRSRV_BRIDGE_IN_RGXKICKTA3D2_TAG
 	IMG_UINT32 ui323DCmdSize;
 	IMG_UINT32 ui323DPRCmdSize;
 	IMG_UINT32 ui32Client3DUpdateCount;
-	IMG_UINT32 ui32ClientCacheOpSeqNum;
 	IMG_UINT32 ui32ClientTAFenceCount;
 	IMG_UINT32 ui32ClientTAUpdateCount;
 	IMG_UINT32 ui32ExtJobRef;
-	IMG_UINT32 ui32FRFenceUFOSyncOffset;
-	IMG_UINT32 ui32FRFenceValue;
 	IMG_UINT32 ui32NumberOfDrawCalls;
 	IMG_UINT32 ui32NumberOfIndices;
 	IMG_UINT32 ui32NumberOfMRTs;
 	IMG_UINT32 ui32PDumpFlags;
+	IMG_UINT32 ui32PRFenceUFOSyncOffset;
+	IMG_UINT32 ui32PRFenceValue;
 	IMG_UINT32 ui32RenderTargetSize;
 	IMG_UINT32 ui32SyncPMRCount;
 	IMG_UINT32 ui32TACmdSize;

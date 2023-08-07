@@ -64,15 +64,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 
-/* Must be consecutive and start from 0 */
-#define PHY_HEAP_CARD_GPU 0
-#define PHY_HEAP_CARD_EXT 1
-#define PHY_HEAP_LMA_NUM  2
-
-#define PHY_HEAP_SYSTEM   PHY_HEAP_LMA_NUM
-#define PHY_HEAP_NUM      3
-
 #define SYS_RGX_ACTIVE_POWER_LATENCY_MS (10)
+
+#define UI64_TOPWORD_IS_ZERO(ui64) ((ui64 >> 32) == 0)
 
 #if defined(SUPPORT_LINUX_DVFS) || defined(SUPPORT_PDVFS)
 
@@ -304,8 +298,23 @@ static void TCHostCpuPAddrToDevPAddr(IMG_HANDLE hPrivData,
 									 IMG_DEV_PHYADDR *psDevPAddr,
 									 IMG_CPU_PHYADDR *psCpuPAddr)
 {
-	PVR_ASSERT(sizeof(*psDevPAddr) == sizeof(*psCpuPAddr));
-	OSCachedMemCopy(psDevPAddr, psCpuPAddr, uiNumOfAddr * sizeof(*psDevPAddr));
+	if (sizeof(*psDevPAddr) == sizeof(*psCpuPAddr))
+	{
+		OSCachedMemCopy(psDevPAddr, psCpuPAddr, uiNumOfAddr * sizeof(*psDevPAddr));
+		return;
+	}
+
+	/* In this case we may have a 32bit host, so we can't do a memcpy */
+	/* Optimise common case */
+	psDevPAddr[0].uiAddr = psCpuPAddr[0].uiAddr;
+	if (uiNumOfAddr > 1)
+	{
+		IMG_UINT32 ui32Idx;
+		for (ui32Idx = 1; ui32Idx < uiNumOfAddr; ++ui32Idx)
+		{
+			psDevPAddr[ui32Idx].uiAddr = psCpuPAddr[ui32Idx].uiAddr;
+		}
+	}
 }
 
 static void TCHostDevPAddrToCpuPAddr(IMG_HANDLE hPrivData,
@@ -313,8 +322,27 @@ static void TCHostDevPAddrToCpuPAddr(IMG_HANDLE hPrivData,
 									 IMG_CPU_PHYADDR *psCpuPAddr,
 									 IMG_DEV_PHYADDR *psDevPAddr)
 {
-	PVR_ASSERT(sizeof(*psCpuPAddr) == sizeof(*psDevPAddr));
-	OSCachedMemCopy(psCpuPAddr, psDevPAddr, uiNumOfAddr * sizeof(*psCpuPAddr));
+	if (sizeof(*psCpuPAddr) == sizeof(*psDevPAddr))
+	{
+		OSCachedMemCopy(psCpuPAddr, psDevPAddr, uiNumOfAddr * sizeof(*psCpuPAddr));
+		return;
+	}
+
+	/* In this case we may have a 32bit host, so we can't do a memcpy.
+	 * Check we are not dropping any data from the 64bit dev addr */
+	PVR_ASSERT(UI64_TOPWORD_IS_ZERO(psDevPAddr[0].uiAddr));
+	/* Optimise common case */
+	psCpuPAddr[0].uiAddr = IMG_CAST_TO_CPUPHYADDR_UINT(psDevPAddr[0].uiAddr);
+	if (uiNumOfAddr > 1)
+	{
+		IMG_UINT32 ui32Idx;
+		for (ui32Idx = 1; ui32Idx < uiNumOfAddr; ++ui32Idx)
+		{
+			PVR_ASSERT(UI64_TOPWORD_IS_ZERO(psDevPAddr[ui32Idx].uiAddr));
+			psCpuPAddr[ui32Idx].uiAddr = IMG_CAST_TO_CPUPHYADDR_UINT(psDevPAddr[ui32Idx].uiAddr);
+		}
+	}
+
 }
 
 static PVRSRV_ERROR
@@ -336,7 +364,7 @@ InitLocalHeap(PHYS_HEAP_CONFIG *psPhysHeap,
 }
 
 static PVRSRV_ERROR
-InitLocalHeaps(const SYS_DATA *psSysData, PHYS_HEAP_CONFIG *pasPhysHeaps)
+InitLocalHeaps(const SYS_DATA *psSysData, PHYS_HEAP_CONFIG *pasPhysHeaps, IMG_UINT32 *pui32PhysHeapCount)
 {
 	struct tc_rogue_platform_data *pdata = psSysData->pdata;
 	PHYS_HEAP_FUNCTIONS *psHeapFuncs;
@@ -354,7 +382,7 @@ InitLocalHeaps(const SYS_DATA *psSysData, PHYS_HEAP_CONFIG *pasPhysHeaps)
 		uiLocalCardBase = 0;
 	}
 
-	eError = InitLocalHeap(&pasPhysHeaps[PHY_HEAP_CARD_GPU],
+	eError = InitLocalHeap(&pasPhysHeaps[(*pui32PhysHeapCount)++],
 						   uiLocalCardBase, pdata->rogue_heap_memory_base,
 						   pdata->rogue_heap_memory_size, psHeapFuncs,
 						   PHYS_HEAP_USAGE_GPU_LOCAL);
@@ -363,7 +391,8 @@ InitLocalHeaps(const SYS_DATA *psSysData, PHYS_HEAP_CONFIG *pasPhysHeaps)
 		return eError;
 	}
 
-	eError = InitLocalHeap(&pasPhysHeaps[PHY_HEAP_CARD_EXT],
+#if TC_DISPLAY_MEM_SIZE != 0
+	eError = InitLocalHeap(&pasPhysHeaps[(*pui32PhysHeapCount)++],
 						   uiLocalCardBase, pdata->pdp_heap_memory_base,
 						   pdata->pdp_heap_memory_size, psHeapFuncs,
 						   PHYS_HEAP_USAGE_EXTERNAL | PHYS_HEAP_USAGE_DISPLAY);
@@ -371,35 +400,45 @@ InitLocalHeaps(const SYS_DATA *psSysData, PHYS_HEAP_CONFIG *pasPhysHeaps)
 	{
 		return eError;
 	}
+#endif
 
 	return PVRSRV_OK;
 }
 
 static PVRSRV_ERROR
-InitHostHeaps(const SYS_DATA *psSysData, PHYS_HEAP_CONFIG *pasPhysHeaps)
+InitHostHeaps(const SYS_DATA *psSysData, PHYS_HEAP_CONFIG *pasPhysHeaps, IMG_UINT32 *pui32PhysHeapCount)
 {
-	pasPhysHeaps[PHY_HEAP_SYSTEM].eType = PHYS_HEAP_TYPE_UMA;
-	pasPhysHeaps[PHY_HEAP_SYSTEM].pszPDumpMemspaceName = "SYSMEM";
-	pasPhysHeaps[PHY_HEAP_SYSTEM].psMemFuncs = &gsHostPhysHeapFuncs;
-	pasPhysHeaps[PHY_HEAP_SYSTEM].ui32UsageFlags = PHYS_HEAP_USAGE_CPU_LOCAL;
+	if (psSysData->pdata->mem_mode != TC_MEMORY_LOCAL)
+	{
+		pasPhysHeaps[*pui32PhysHeapCount].eType = PHYS_HEAP_TYPE_UMA;
+		pasPhysHeaps[*pui32PhysHeapCount].pszPDumpMemspaceName = "SYSMEM";
+		pasPhysHeaps[*pui32PhysHeapCount].psMemFuncs = &gsHostPhysHeapFuncs;
+		pasPhysHeaps[*pui32PhysHeapCount].ui32UsageFlags = PHYS_HEAP_USAGE_CPU_LOCAL;
+
+		(*pui32PhysHeapCount)++;
+
+		PVR_DPF((PVR_DBG_WARNING,
+				 "Initialising CPU_LOCAL UMA Host PhysHeaps with memory mode: %d",
+				 psSysData->pdata->mem_mode));
+	}
 
 	return PVRSRV_OK;
 }
 
 static PVRSRV_ERROR
 PhysHeapsInit(const SYS_DATA *psSysData, PHYS_HEAP_CONFIG *pasPhysHeaps,
-			  void *pvPrivData)
+			  void *pvPrivData, IMG_UINT32 *pui32PhysHeapCount)
 {
 	PVRSRV_ERROR eError;
 	IMG_UINT32 i;
 
-	eError = InitLocalHeaps(psSysData, pasPhysHeaps);
+	eError = InitLocalHeaps(psSysData, pasPhysHeaps, pui32PhysHeapCount);
 	if (eError != PVRSRV_OK)
 	{
 		return eError;
 	}
 
-	eError = InitHostHeaps(psSysData, pasPhysHeaps);
+	eError = InitHostHeaps(psSysData, pasPhysHeaps, pui32PhysHeapCount);
 	if (eError != PVRSRV_OK)
 	{
 		return eError;
@@ -409,7 +448,7 @@ PhysHeapsInit(const SYS_DATA *psSysData, PHYS_HEAP_CONFIG *pasPhysHeaps,
 	 * Fix up heap IDs. This is needed for multi-testchip systems to
 	 * ensure the heap IDs are unique as this is what Services expects.
 	 */
-	for (i = 0; i < PHY_HEAP_NUM; i++)
+	for (i = 0; i < *pui32PhysHeapCount; i++)
 	{
 		pasPhysHeaps[i].hPrivData = pvPrivData;
 	}
@@ -423,23 +462,46 @@ PhysHeapsCreate(const SYS_DATA *psSysData, void *pvPrivData,
 				IMG_UINT32 *puiPhysHeapCountOut)
 {
 	PHYS_HEAP_CONFIG *pasPhysHeaps;
+	IMG_UINT32 ui32NumPhysHeaps;
+	IMG_UINT32 ui32PhysHeapCount = 0;
 	PVRSRV_ERROR eError;
 
-	pasPhysHeaps = OSAllocMem(sizeof(*pasPhysHeaps) * PHY_HEAP_NUM);
+	switch (psSysData->pdata->mem_mode)
+	{
+		case TC_MEMORY_LOCAL: ui32NumPhysHeaps = 1U; break;
+		case TC_MEMORY_HYBRID: ui32NumPhysHeaps = 2U; break;
+		default:
+		{
+			PVR_DPF((PVR_DBG_ERROR, "%s: unsupported memory mode %d", __func__, psSysData->pdata->mem_mode));
+			return PVRSRV_ERROR_NOT_IMPLEMENTED;
+		}
+	}
+
+#if TC_DISPLAY_MEM_SIZE != 0
+	if (psSysData->pdata->mem_mode == TC_MEMORY_LOCAL ||
+		psSysData->pdata->mem_mode == TC_MEMORY_HYBRID)
+	{
+		ui32NumPhysHeaps += 1U;
+	}
+#endif
+
+	pasPhysHeaps = OSAllocMem(sizeof(*pasPhysHeaps) * ui32NumPhysHeaps);
 	if (!pasPhysHeaps)
 	{
 		return PVRSRV_ERROR_OUT_OF_MEMORY;
 	}
 
-	eError = PhysHeapsInit(psSysData, pasPhysHeaps, pvPrivData);
+	eError = PhysHeapsInit(psSysData, pasPhysHeaps, pvPrivData, &ui32PhysHeapCount);
 	if (eError != PVRSRV_OK)
 	{
 		OSFreeMem(pasPhysHeaps);
 		return eError;
 	}
 
+	PVR_ASSERT(ui32PhysHeapCount == ui32NumPhysHeaps);
+
 	*ppasPhysHeapsOut = pasPhysHeaps;
-	*puiPhysHeapCountOut = PHY_HEAP_NUM;
+	*puiPhysHeapCountOut = ui32PhysHeapCount;
 
 	return PVRSRV_OK;
 }
@@ -578,6 +640,21 @@ static PVRSRV_ERROR DeviceConfigCreate(SYS_DATA *psSysData,
 
 	psDevConfig->hDevData = psRGXData;
 	psDevConfig->hSysData = psSysData;
+
+#if defined(SUPPORT_ALT_REGBASE)
+	if (psSysData->pdata->mem_mode != TC_MEMORY_LOCAL)
+	{
+		PVR_DPF((PVR_DBG_ERROR, "%s: alternative GPU register base is "
+					"supported only in LMA mode", __func__));
+		goto ErrorFreeDevConfig;
+	}
+
+	/* Using display memory base as the alternative GPU register base,
+	 * since the display memory range is not used by the firmware. */
+	TCLocalCpuPAddrToDevPAddr(psDevConfig, 1,
+			&psDevConfig->sAltRegsGpuPBase,
+			&pasPhysHeaps[PHY_HEAP_CARD_EXT].sStartAddr);
+#endif
 
 #if defined(SUPPORT_LINUX_DVFS) || defined(SUPPORT_PDVFS)
 	/* Fake DVFS configuration used purely for testing purposes */
@@ -790,8 +867,6 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 
 	psSysData->pdev = to_platform_device((struct device *)pvOSDevice);
 	psSysData->pdata = psSysData->pdev->dev.platform_data;
-
-	PVR_ASSERT(TC_MEMORY_CONFIG == psSysData->pdata->mem_mode);
 
 	/*
 	 * The device cannot address system memory, so there is no DMA

@@ -234,10 +234,12 @@ copyfile include/pvrsrv_tlcommon.h drivers/gpu/drm/img-rogue/pvrsrv_tlcommon.h
 copyfile include/pvrsrv_tlstreams.h drivers/gpu/drm/img-rogue/pvrsrv_tlstreams.h
 copyfile include/pvrversion.h drivers/gpu/drm/img-rogue/pvrversion.h
 copyfile include/rgx_common.h drivers/gpu/drm/img-rogue/rgx_common.h
+copyfile include/rgx_common_asserts.h drivers/gpu/drm/img-rogue/rgx_common_asserts.h
 copyfile include/rgx_compat_bvnc.h drivers/gpu/drm/img-rogue/rgx_compat_bvnc.h
 copyfile include/rgx_fwif_resetframework.h drivers/gpu/drm/img-rogue/rgx_fwif_resetframework.h
 copyfile include/rgx_fwif_sf.h drivers/gpu/drm/img-rogue/rgx_fwif_sf.h
 copyfile include/rgx_heap_firmware.h drivers/gpu/drm/img-rogue/rgx_heap_firmware.h
+copyfile include/rgx_hwperf_common.h drivers/gpu/drm/img-rogue/rgx_hwperf_common.h
 copyfile include/rgx_meta.h drivers/gpu/drm/img-rogue/rgx_meta.h
 copyfile include/rgx_mips.h drivers/gpu/drm/img-rogue/rgx_mips.h
 copyfile include/rgx_riscv.h drivers/gpu/drm/img-rogue/rgx_riscv.h
@@ -288,7 +290,6 @@ copyfile kernel/drivers/staging/imgtec/tc/pdp_plato.h drivers/gpu/drm/img-rogue/
 copyfile kernel/drivers/staging/imgtec/tc/tc_apollo.h drivers/gpu/drm/img-rogue/apollo/tc_apollo.h
 copyfile kernel/drivers/staging/imgtec/tc/tc_drv.h drivers/gpu/drm/img-rogue/apollo/tc_drv.h
 copyfile kernel/drivers/staging/imgtec/tc/tc_drv_internal.h drivers/gpu/drm/img-rogue/apollo/tc_drv_internal.h
-copyfile kernel/drivers/staging/imgtec/tc/tc_ion.h drivers/gpu/drm/img-rogue/apollo/tc_ion.h
 copyfile kernel/drivers/staging/imgtec/tc/tc_odin.h drivers/gpu/drm/img-rogue/apollo/tc_odin.h
 copyfile kernel/drivers/staging/imgtec/tc/tc_odin_common_regs.h drivers/gpu/drm/img-rogue/apollo/tc_odin_common_regs.h
 copyfile services/include/htbuffer_sf.h drivers/gpu/drm/img-rogue/htbuffer_sf.h

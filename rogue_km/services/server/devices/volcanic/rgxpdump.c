@@ -48,6 +48,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pdumpdesc.h"
 #if defined(SUPPORT_VALIDATION)
 #include "validation_soc.h"
+#include "rgxtbdefs.h"
 #endif
 
 /*
@@ -252,16 +253,6 @@ PVRSRV_ERROR PVRSRVPDumpSignatureBufferKM(CONNECTION_DATA * psConnection,
 
 	return PVRSRV_OK;
 }
-
-
-#if !defined(RGX_CR_FBCDC_SIGNATURE_STATUS)
-    #define RGX_CR_FBCDC_SIGNATURE_STATUS       (0xF618U)
-#endif
-#if !defined(RGX_TB_SYSTEM_STATUS)
-	#define RGX_TB_SYSTEM_STATUS                (0x00E0U)
-	#define RGX_TB_SYSTEM_STATUS_GPU_STATE_CLRMSK             (IMG_UINT64_C(0xFFFFFFFFFF0FFFFF))
-#endif
-
 
 #if defined(SUPPORT_VALIDATION)
 PVRSRV_ERROR PVRSRVPDumpComputeCRCSignatureCheckKM(CONNECTION_DATA * psConnection,
@@ -541,6 +532,7 @@ PVRSRV_ERROR RGXPDumpPrepareOutputImageDescriptorHdr(PVRSRV_DEVICE_NODE *psDevic
 	{
 	case IMG_FB_COMPRESSION_NONE:
 		break;
+	case IMG_FB_COMPRESSION_DIRECT_PACKED_8x8:
 	case IMG_FB_COMPRESSION_DIRECT_8x8:
 	case IMG_FB_COMPRESSION_DIRECT_LOSSY50_8x8:
 		pui32Word[8] |= IMAGE_HEADER_WORD8_FBCTYPE_8X8;
@@ -565,7 +557,7 @@ PVRSRV_ERROR RGXPDumpPrepareOutputImageDescriptorHdr(PVRSRV_DEVICE_NODE *psDevic
 
 	if (eFBCompression != IMG_FB_COMPRESSION_NONE)
 	{
-		if (RGX_GET_FEATURE_VALUE(psDevInfo, FBCDC) == 4)
+		if ((RGX_GET_FEATURE_VALUE(psDevInfo, FBCDC) == 4) || (RGX_GET_FEATURE_VALUE(psDevInfo, FBCDC) == 5))
 		{
 			pui32Word[9] |= IMAGE_HEADER_WORD9_FBCCOMPAT_V4;
 

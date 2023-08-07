@@ -71,6 +71,20 @@
 #define pdp_gem_platform_data tc_pdp_platform_data
 #endif
 
+const struct vm_operations_struct pdp_gem_vm_ops = {
+	.fault	= pdp_gem_object_vm_fault,
+	.open	= drm_gem_vm_open,
+	.close	= drm_gem_vm_close,
+};
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0))
+const struct drm_gem_object_funcs pdp_gem_funcs = {
+	.export = pdp_gem_prime_export,
+	.free = pdp_gem_object_free,
+	.vm_ops = &pdp_gem_vm_ops,
+};
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0) */
+
 struct pdp_gem_private {
 	struct mutex			vram_lock;
 	struct				drm_mm vram;
@@ -150,6 +164,13 @@ err_unref:
 	pdp_gem_object_free_priv(gem_priv, &pdp_obj->base);
 err_exit:
 	return ERR_PTR(err);
+}
+
+void pdp_gem_object_free(struct drm_gem_object *obj)
+{
+	struct pdp_drm_private *dev_priv = obj->dev->dev_private;
+
+	pdp_gem_object_free_priv(dev_priv->gem_priv, obj);
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
@@ -693,17 +714,23 @@ int pdp_gem_object_cpu_prep_ioctl(struct drm_device *dev, void *data,
 	if (wait) {
 		long lerr;
 
-		lerr = dma_resv_wait_timeout_rcu(pdp_obj->resv,
-						 write,
-						 true,
-						 30 * HZ);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
+		lerr = dma_resv_wait_timeout(pdp_obj->resv, write,
+					     true, 30 * HZ);
+#else
+		lerr = dma_resv_wait_timeout_rcu(pdp_obj->resv, write,
+						 true, 30 * HZ);
+#endif
 		if (!lerr)
 			err = -EBUSY;
 		else if (lerr < 0)
 			err = lerr;
 	} else {
-		if (!dma_resv_test_signaled_rcu(pdp_obj->resv,
-						write))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
+		if (!dma_resv_test_signaled(pdp_obj->resv, write))
+#else
+		if (!dma_resv_test_signaled_rcu(pdp_obj->resv, write))
+#endif
 			err = -EBUSY;
 	}
 

@@ -305,6 +305,8 @@ ALL_CFLAGS := $(patsubst -O0,-O1,$(ALL_CFLAGS))
 ALL_CXXFLAGS := $(patsubst -O0,-O1,$(ALL_CXXFLAGS))
 endif
 endif
+# Add check for clang >= 13
+__clang_ge_13 := $(shell ((test $(__clang_major) -ge 13) && echo 1 || echo 0))
 endif
 
 # Add GCOV_DIR just for target

@@ -54,7 +54,12 @@
 
 #include "tc_drv_internal.h"
 #include "tc_apollo.h"
+
+#if defined(SUPPORT_DMA_HEAP)
+#include "tc_dmabuf_heap.h"
+#elif defined(SUPPORT_ION)
 #include "tc_ion.h"
+#endif
 
 #include "apollo_regs.h"
 #include "tcf_clk_ctrl.h"
@@ -969,13 +974,19 @@ static int apollo_dev_init(struct tc_device *tc, struct pci_dev *pdev,
 	tc->secure_heap_mem_size = secure_mem_size;
 #endif
 
-#if defined(SUPPORT_ION)
+#if defined(SUPPORT_DMA_HEAP)
+	err = tc_dmabuf_heap_init(tc, APOLLO_MEM_PCI_BASENUM);
+	if (err) {
+		dev_err(&pdev->dev, "Failed to initialise DMA heap\n");
+		goto err_unmap_fpga_registers;
+	}
+#elif defined(SUPPORT_ION)
 	err = tc_ion_init(tc, APOLLO_MEM_PCI_BASENUM);
 	if (err) {
 		dev_err(&pdev->dev, "Failed to initialise ION\n");
 		goto err_unmap_fpga_registers;
 	}
-#endif
+#endif /* defined(SUPPORT_ION) */
 
 #if defined(SUPPORT_APOLLO_FPGA)
 	apollo_debugfs_add_fpga_entries(tc, &apollo_pdata.fpga,
@@ -1007,7 +1018,9 @@ static void apollo_dev_cleanup(struct tc_device *tc)
 	apollo_debugfs_remove_fpga_entries(&apollo_pdata.fpga_entries);
 #endif
 
-#if defined(SUPPORT_ION)
+#if defined(SUPPORT_DMA_HEAP)
+	tc_dmabuf_heap_deinit(tc, APOLLO_MEM_PCI_BASENUM);
+#elif defined(SUPPORT_ION)
 	tc_ion_deinit(tc, APOLLO_MEM_PCI_BASENUM);
 #endif
 

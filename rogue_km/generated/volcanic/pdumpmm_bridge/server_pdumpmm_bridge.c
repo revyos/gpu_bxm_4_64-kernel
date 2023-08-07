@@ -890,7 +890,7 @@ DevmemIntPDumpSaveToFileVirtual_exit:
  */
 
 PVRSRV_ERROR InitPDUMPMMBridge(void);
-PVRSRV_ERROR DeinitPDUMPMMBridge(void);
+void DeinitPDUMPMMBridge(void);
 
 /*
  * Register all PDUMPMM functions with services
@@ -932,7 +932,7 @@ PVRSRV_ERROR InitPDUMPMMBridge(void)
 /*
  * Unregister all pdumpmm functions with services
  */
-PVRSRV_ERROR DeinitPDUMPMMBridge(void)
+void DeinitPDUMPMMBridge(void)
 {
 
 	UnsetDispatchTableEntry(PVRSRV_BRIDGE_PDUMPMM, PVRSRV_BRIDGE_PDUMPMM_PMRPDUMPLOADMEM);
@@ -956,5 +956,4 @@ PVRSRV_ERROR DeinitPDUMPMMBridge(void)
 	UnsetDispatchTableEntry(PVRSRV_BRIDGE_PDUMPMM,
 				PVRSRV_BRIDGE_PDUMPMM_DEVMEMINTPDUMPSAVETOFILEVIRTUAL);
 
-	return PVRSRV_OK;
 }

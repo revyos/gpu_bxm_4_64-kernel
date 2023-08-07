@@ -392,7 +392,7 @@ static INLINE IMG_UINT64 RGXReadHWTimerReg(PVRSRV_RGXDEV_INFO *psDevInfo)
 IMG_BOOL RGXTraceBufferIsInitRequired(PVRSRV_RGXDEV_INFO *psDevInfo);
 PVRSRV_ERROR RGXTraceBufferInitOnDemandResources(PVRSRV_RGXDEV_INFO* psDevInfo, PVRSRV_MEMALLOCFLAGS_T uiAllocFlags);
 
-#if defined(SUPPORT_POWMON_COMPONENT)
+#if defined(SUPPORT_POWMON_COMPONENT) && defined(SUPPORT_POWER_VALIDATION_VIA_DEBUGFS)
 IMG_BOOL RGXPowmonBufferIsInitRequired(PVRSRV_RGXDEV_INFO *psDevInfo);
 PVRSRV_ERROR RGXPowmonBufferInitOnDemandResources(PVRSRV_RGXDEV_INFO *psDevInfo);
 #endif
@@ -423,7 +423,8 @@ PVRSRV_ERROR RGXSetupFirmware(PVRSRV_DEVICE_NODE       *psDeviceNode,
                               RGX_RD_POWER_ISLAND_CONF eRGXRDPowerIslandConf,
                               FW_PERF_CONF             eFirmwarePerf,
                               IMG_UINT32               ui32KCCBSizeLog2,
-                              IMG_UINT32               ui32AvailableSPUMask);
+                              IMG_UINT32               ui32AvailableSPUMask,
+							  IMG_UINT32               ui32AvailableRACMask);
 
 
 
@@ -572,7 +573,7 @@ PVRSRV_ERROR RGXGetFWCommonContextAddrFromServerMMUCtx(PVRSRV_RGXDEV_INFO *psDev
 													   PRGXFWIF_FWCOMMONCONTEXT *psFWCommonContextFWAddr);
 
 PVRSRV_ERROR FWCommonContextSetFlags(RGX_SERVER_COMMON_CONTEXT *psServerCommonContext,
-									 IMG_UINT32 ui32ContextFlags);
+                                     IMG_UINT32 ui32ContextFlags);
 
 /*!
 *******************************************************************************
@@ -683,7 +684,6 @@ PVRSRV_ERROR RGXSendCommandAndGetKCCBSlot(PVRSRV_RGXDEV_INFO *psDevInfo,
 @Input          psDevInfo           Device Info
 @Input          eDM                 To which DM the cmd is sent.
 @Input          psKCCBCmd           The cmd to send.
-@Input          ui32CacheOpFence    Pending cache op. fence value.
 @Input          ui32PDumpFlags      PDump flags
 @Output         pui32CmdKCCBSlot    When non-NULL:
                                     - Pointer on return contains the kCCB slot
@@ -696,11 +696,10 @@ PVRSRV_ERROR RGXSendCommandAndGetKCCBSlot(PVRSRV_RGXDEV_INFO *psDevInfo,
 PVRSRV_ERROR RGXScheduleCommandAndGetKCCBSlot(PVRSRV_RGXDEV_INFO *psDevInfo,
 								RGXFWIF_DM         eKCCBType,
 								RGXFWIF_KCCB_CMD   *psKCCBCmd,
-								IMG_UINT32         ui32CacheOpFence,
 								IMG_UINT32         ui32PDumpFlags,
 								IMG_UINT32         *pui32CmdKCCBSlot);
-#define RGXScheduleCommand(psDevInfo, eKCCBType, psKCCBCmd, ui32CacheOpFence, ui32PDumpFlags) \
-  RGXScheduleCommandAndGetKCCBSlot(psDevInfo, eKCCBType, psKCCBCmd, ui32CacheOpFence, ui32PDumpFlags, NULL)
+#define RGXScheduleCommand(psDevInfo, eKCCBType, psKCCBCmd, ui32PDumpFlags) \
+  RGXScheduleCommandAndGetKCCBSlot(psDevInfo, eKCCBType, psKCCBCmd, ui32PDumpFlags, NULL)
 
 /*************************************************************************/ /*!
 @Function       RGXWaitForKCCBSlotUpdate
@@ -976,43 +975,6 @@ PVRSRV_ERROR RGXFWConfigWdg(PVRSRV_RGXDEV_INFO *psDevInfo,
 
 /*!
 *******************************************************************************
-@Function      RGXReadMETAAddr
-
-@Description    Reads a value at given address in META memory space
-                (it can be either a memory location or a META register)
-
-@Input          psDevInfo       pointer to device info
-@Input          ui32METAAddr    address in META memory space
-
-@Output         pui32Value      value
-
-@Return         PVRSRV_ERROR
-******************************************************************************/
-
-PVRSRV_ERROR RGXReadMETAAddr(PVRSRV_RGXDEV_INFO	*psDevInfo,
-                             IMG_UINT32 ui32METAAddr,
-                             IMG_UINT32 *pui32Value);
-
-/*!
-*******************************************************************************
-@Function      RGXWriteMETAAddr
-
-@Description    Write a value to the given address in META memory space
-                (it can be either a memory location or a META register)
-
-@Input          psDevInfo       pointer to device info
-@Input          ui32METAAddr    address in META memory space
-@Input          ui32Value       Value to write to address in META memory space
-
-@Return         PVRSRV_ERROR
-******************************************************************************/
-
-PVRSRV_ERROR RGXWriteMETAAddr(PVRSRV_RGXDEV_INFO *psDevInfo,
-                              IMG_UINT32 ui32METAAddr,
-                              IMG_UINT32 ui32Value);
-
-/*!
-*******************************************************************************
 @Function       RGXCheckFirmwareCCB
 
 @Description    Processes all commands that are found in the Firmware CCB.
@@ -1272,23 +1234,6 @@ PVRSRV_ERROR RGXRiscvWriteReg(PVRSRV_RGXDEV_INFO *psDevInfo,
 
 /*!
 *******************************************************************************
-@Function       RGXRiscvReadMem
-
-@Description    Read a value at the given address in RISC-V memory space
-
-@Input          psDevInfo       Pointer to device info
-@Input          ui32Addr        Address in RISC-V memory space
-
-@Output         pui32Value      Read value
-
-@Return         PVRSRV_ERROR
-******************************************************************************/
-PVRSRV_ERROR RGXRiscvReadMem(PVRSRV_RGXDEV_INFO *psDevInfo,
-                             IMG_UINT32 ui32Addr,
-                             IMG_UINT32 *pui32Value);
-
-/*!
-*******************************************************************************
 @Function       RGXRiscvPollMem
 
 @Description    Poll for a value at the given address in RISC-V memory space
@@ -1302,22 +1247,6 @@ PVRSRV_ERROR RGXRiscvReadMem(PVRSRV_RGXDEV_INFO *psDevInfo,
 PVRSRV_ERROR RGXRiscvPollMem(PVRSRV_RGXDEV_INFO *psDevInfo,
                              IMG_UINT32 ui32Addr,
                              IMG_UINT32 ui32Value);
-
-/*!
-*******************************************************************************
-@Function       RGXRiscvWriteMem
-
-@Description    Write a value to the given address in RISC-V memory space
-
-@Input          psDevInfo       Pointer to device info
-@Input          ui32Addr        Address in RISC-V memory space
-@Input          ui32Value       Write value
-
-@Return         PVRSRV_ERROR
-******************************************************************************/
-PVRSRV_ERROR RGXRiscvWriteMem(PVRSRV_RGXDEV_INFO *psDevInfo,
-                              IMG_UINT32 ui32MemAddr,
-                              IMG_UINT32 ui32Value);
 
 /*!
 *******************************************************************************
@@ -1337,6 +1266,61 @@ PVRSRV_ERROR RGXRiscvWriteMem(PVRSRV_RGXDEV_INFO *psDevInfo,
 ******************************************************************************/
 PVRSRV_ERROR RGXRiscvDmiOp(PVRSRV_RGXDEV_INFO *psDevInfo,
                            IMG_UINT64 *pui64DMI);
+
+/*!
+*******************************************************************************
+@Function       RGXReadFWModuleAddr
+
+@Description    Read a value at the given address in META or RISCV memory space
+
+@Input          psDevInfo       Pointer to device info
+@Input          ui32Addr        Address in META or RISCV memory space
+
+@Output         pui32Value      Read value
+
+@Return         PVRSRV_ERROR
+******************************************************************************/
+PVRSRV_ERROR RGXReadFWModuleAddr(PVRSRV_RGXDEV_INFO *psDevInfo,
+                                 IMG_UINT32 ui32Addr,
+                                 IMG_UINT32 *pui32Value);
+
+/*!
+*******************************************************************************
+@Function       RGXWriteFWModuleAddr
+
+@Description    Write a value to the given address in META or RISC memory space
+
+@Input          psDevInfo       Pointer to device info
+@Input          ui32Addr        Address in RISC-V memory space
+@Input          ui32Value       Write value
+
+@Return         PVRSRV_ERROR
+******************************************************************************/
+PVRSRV_ERROR RGXWriteFWModuleAddr(PVRSRV_RGXDEV_INFO *psDevInfo,
+                                  IMG_UINT32 ui32MemAddr,
+                                  IMG_UINT32 ui32Value);
+
+/*!
+*******************************************************************************
+@Function       RGXGetFwMapping
+
+@Description    Retrieve any of the CPU Physical Address, Device Physical
+                Address or the raw value of the page table entry associated
+                with the firmware virtual address given.
+
+@Input          psDevInfo       Pointer to device info
+@Input          ui32FwVA        The Fw VA that needs decoding
+@Output         psCpuPA         Pointer to the resulting CPU PA
+@Output         psDevPA         Pointer to the resulting Dev PA
+@Output         pui64RawPTE     Pointer to  the raw Page Table Entry value
+
+@Return         PVRSRV_ERROR
+******************************************************************************/
+PVRSRV_ERROR RGXGetFwMapping(PVRSRV_RGXDEV_INFO *psDevInfo,
+                                    IMG_UINT32 ui32FwVA,
+                                    IMG_CPU_PHYADDR *psCpuPA,
+                                    IMG_DEV_PHYADDR *psDevPA,
+                                    IMG_UINT64 *pui64RawPTE);
 
 #if defined(SUPPORT_AUTOVZ_HW_REGS) && !defined(SUPPORT_AUTOVZ)
 #error "VZ build configuration error: use of OS scratch registers supported only in AutoVz drivers."

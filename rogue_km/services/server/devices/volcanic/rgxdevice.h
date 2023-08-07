@@ -206,6 +206,7 @@ typedef struct _PVRSRV_DEVICE_FEATURE_CONFIG_
 	IMG_UINT32 ui32FeaturesValues[RGX_FEATURE_WITH_VALUES_MAX_IDX];
 	IMG_UINT32 ui32MAXDMCount;
 	IMG_UINT32 ui32MAXPowUnitCount;
+	IMG_UINT32 ui32MAXRACCount;
 	IMG_UINT32 ui32SLCSizeInBytes;
 	IMG_PCHAR  pszBVNCString;
 }PVRSRV_DEVICE_FEATURE_CONFIG;
@@ -523,6 +524,7 @@ typedef struct _PVRSRV_RGXDEV_INFO_
 	DEVMEM_MEMDESC			*psRGXFWIfConnectionCtlMemDesc;
 	RGXFWIF_CONNECTION_CTL	*psRGXFWIfConnectionCtl;
 
+	DEVMEM_MEMDESC			*psRGXFWHeapGuardPageReserveMemDesc;
 	DEVMEM_MEMDESC			*psRGXFWIfSysInitMemDesc;
 	RGXFWIF_SYSINIT			*psRGXFWIfSysInit;
 
@@ -712,6 +714,7 @@ typedef struct _PVRSRV_RGXDEV_INFO_
 	IMG_UINT32				ui32ValidationFlags;	/*!< Validation flags for host driver */
 #endif
 	IMG_UINT32				ui32AvailablePowUnitsMask;
+	IMG_UINT32				ui32AvailableRACMask;
 
 	RGX_LAYER_PARAMS		sLayerParams;
 

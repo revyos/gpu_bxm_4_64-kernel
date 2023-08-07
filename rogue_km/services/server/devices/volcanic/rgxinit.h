@@ -76,7 +76,8 @@ PVRSRV_ERROR RGXInitDevPart2 (PVRSRV_DEVICE_NODE	*psDeviceNode,
 							  IMG_UINT32			ui32DeviceFlags,
 							  IMG_UINT32			ui32HWPerfHostFilter,
 							  RGX_ACTIVEPM_CONF		eActivePMConf,
-							  IMG_UINT32			ui32AvailableSPUMask);
+							  IMG_UINT32			ui32AvailableSPUMask,
+							  IMG_UINT32			ui32AvailableRACMask);
 
 PVRSRV_ERROR RGXInitAllocFWImgMem(PVRSRV_DEVICE_NODE   *psDeviceNode,
                                   IMG_DEVMEM_SIZE_T    ui32FWCodeLen,
@@ -121,6 +122,7 @@ RGXInitFirmware(PVRSRV_DEVICE_NODE       *psDeviceNode,
                 IMG_UINT32               ui32KCCBSizeLog2,
                 IMG_UINT32               ui32ConfigFlagsExt,
                 IMG_UINT32               ui32AvailableSPUMask,
+                IMG_UINT32               ui32AvailableRACMask,
                 IMG_UINT32               ui32FwOsCfgFlags);
 
 

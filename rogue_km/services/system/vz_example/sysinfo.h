@@ -1,6 +1,8 @@
 /*************************************************************************/ /*!
-@Title          RGX Core BVNC 36.30.54.182
+@File
+@Title          System Description Header
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
+@Description    This header provides system-specific declarations and macros
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -39,36 +41,17 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#ifndef RGXCORE_KM_36_30_54_182_H
-#define RGXCORE_KM_36_30_54_182_H
+#if !defined(__SYSINFO_H__)
+#define __SYSINFO_H__
 
-/* Automatically generated file (29/06/2021 09:01:17): Do not edit manually */
-/* CS: @5749248 */
+/*!< System specific poll/timeout details */
+#define MAX_HW_TIME_US                           (500000)
+#define DEVICES_WATCHDOG_POWER_ON_SLEEP_TIMEOUT  (10000)
+#define DEVICES_WATCHDOG_POWER_OFF_SLEEP_TIMEOUT (3600000)
+#define WAIT_TRY_COUNT                           (10000)
 
-/******************************************************************************
- * BVNC = 36.30.54.182
- *****************************************************************************/
-#define RGX_BVNC_KM_B 36
-#define RGX_BVNC_KM_V 30
-#define RGX_BVNC_KM_N 54
-#define RGX_BVNC_KM_C 182
+#if defined(__linux__)
+#define SYS_RGX_DEV_NAME                         "powervr-vz-example"
+#endif
 
-/******************************************************************************
- * Errata
- *****************************************************************************/
-
-#define FIX_HW_BRN_63553
-
-
-
-/******************************************************************************
- * Enhancements
- *****************************************************************************/
-#define HW_ERN_42290
-#define HW_ERN_42606
-#define HW_ERN_47025
-#define HW_ERN_57596
-
-
-
-#endif /* RGXCORE_KM_36_30_54_182_H */
+#endif /* !defined(__SYSINFO_H__) */
