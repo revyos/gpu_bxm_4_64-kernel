@@ -124,11 +124,6 @@ static IMG_INT32 devfreq_target(struct device *dev, unsigned long *requested_fre
 	}
 
 	psRGXTimingInfo = psRGXData->psRGXTimingInfo;
-	if (!psDVFSDevice->bEnabled)
-	{
-		*requested_freq = psRGXTimingInfo->ui32CoreClockSpeed;
-		return 0;
-	}
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0))
 	rcu_read_lock();
@@ -159,12 +154,24 @@ static IMG_INT32 devfreq_target(struct device *dev, unsigned long *requested_fre
 		return 0;
 	}
 
+	if (psDeviceNode->eCurrentSysPowerState != PVRSRV_SYS_POWER_STATE_ON)
+	{
+		*requested_freq = psRGXTimingInfo->ui32CoreClockSpeed;
+		return 0;
+	}
+
 	if (PVRSRV_OK != PVRSRVDevicePreClockSpeedChange(psDeviceNode,
 													 psDVFSDeviceCfg->bIdleReq,
 													 NULL))
 	{
 		dev_err(dev, "PVRSRVDevicePreClockSpeedChange failed\n");
 		return -EPERM;
+	}
+
+	if (!psDVFSDevice->bEnabled)
+	{
+		*requested_freq = psRGXTimingInfo->ui32CoreClockSpeed;
+		goto ClockSpeedChangePost;
 	}
 
 	/* Increasing frequency, change voltage first */
@@ -183,9 +190,9 @@ static IMG_INT32 devfreq_target(struct device *dev, unsigned long *requested_fre
 
 	psRGXTimingInfo->ui32CoreClockSpeed = ui32Freq;
 
+ClockSpeedChangePost:
 	PVRSRVDevicePostClockSpeedChange(psDeviceNode, psDVFSDeviceCfg->bIdleReq,
 									 NULL);
-
 	return 0;
 }
 
@@ -642,6 +649,13 @@ PVRSRV_ERROR RegisterDVFSDevice(PPVRSRV_DEVICE_NODE psDeviceNode)
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "PVRSRVInit: Failed to suspend DVFS"));
+		goto err_exit;
+	}
+	err = devfreq_suspend_device(psDVFSDevice->psDevFreq);
+	if (err < 0)
+	{
+		PVR_DPF((PVR_DBG_ERROR, "failed to suspend the devfreq devices"));
+		eError = TO_IMG_ERR(err);
 		goto err_exit;
 	}
 
