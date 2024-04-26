@@ -801,11 +801,11 @@ elif [ ! -z "$DISCIMAGE" ]; then
         echo "Running ldconfig"
         ldconfig
         # Ensure installed files get written to disk
-        sync
+        # sync
         echo "${INSTALL_PREFIX_CAP}nstallation complete!"
     else
         # Ensure installed files get written to disk
-        sync
+        # sync
         echo "To complete ${INSTALL_PREFIX}nstall, please run the following on the target system:"
         echo "$ depmod"
         echo "$ ldconfig"

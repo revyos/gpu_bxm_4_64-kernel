@@ -54,3 +54,5 @@ $(PVRSRVKM_NAME)-y += services/system/rogue/$(PVR_SYSTEM)/sysconfig.o \
 ifeq ($(SUPPORT_ION),1)
 $(PVRSRVKM_NAME)-y += services/system/common/env/linux/ion_support_generic.o
 endif
+
+ccflags-y += -DTRACE_INCLUDE_PATH=$(TOP)/services/system/rogue/rgx_thead
